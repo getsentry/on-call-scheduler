@@ -5,11 +5,12 @@ A Python CLI tool for analyzing PagerDuty on-call schedules and identifying team
 ## Features
 
 - Fetch on-call schedules by PagerDuty team
+- **Timezone-aware per-user calculations** - each user's on-call time is calculated in their local timezone
+- **After-hours only counting** - only counts days where on-call coverage extends past standard workday hours (configurable, default: 5 PM)
 - Calculate on-call days per user for a specified month
 - Identify users exceeding configurable daily limits
 - Beautiful color-coded terminal output using Rich
 - JSON output support for automation and scripting
-- Timezone-aware date calculations
 - Configurable via environment variables or CLI arguments
 
 ## Installation
@@ -93,6 +94,42 @@ When configured, the application will automatically:
 - Associate errors with specific releases
 
 To disable Sentry, simply omit the `SENTRY_DSN` environment variable.
+
+## How It Works: Timezone-Aware After-Hours Counting
+
+The scheduler uses timezone-aware calculations to only count days where users have on-call coverage **extending past standard workday hours**. This means:
+
+### Key Concepts
+
+1. **User Timezones**: Each user is assigned a timezone (from PagerDuty API, or configured via `USER_TIMEZONES`, or defaults to schedule timezone)
+
+2. **Workday End Hour**: Configurable via `WORKDAY_END_HOUR` (default: 17 for 5 PM)
+
+3. **After-Hours Coverage**: A day is only counted if the user's on-call shift extends past the workday end hour on that specific day in their local timezone
+
+### Examples
+
+**Scenario 1: Full Day Coverage**
+- User timezone: America/New_York (EST/EDT)
+- Shift: Jan 1, 12:00 AM - Jan 2, 12:00 AM EST
+- **Result**: Jan 1 is counted (coverage extends past 5 PM EST)
+
+**Scenario 2: Business Hours Only**
+- User timezone: America/New_York
+- Shift: Jan 1, 9:00 AM - Jan 1, 5:00 PM EST
+- **Result**: Jan 1 is NOT counted (coverage ends at 5 PM, doesn't extend past it)
+
+**Scenario 3: Evening Shift**
+- User timezone: America/New_York
+- Shift: Jan 1, 5:00 PM - Jan 2, 9:00 AM EST
+- **Result**: Both Jan 1 and Jan 2 are counted (coverage extends past 5 PM on Jan 1, and past 5 PM on Jan 2)
+
+**Scenario 4: Night Shift**
+- User timezone: Europe/London
+- Shift: Jan 1, 10:00 PM - Jan 2, 6:00 AM GMT
+- **Result**: Jan 1 is counted (shift extends past 5 PM), Jan 2 is NOT counted (shift ends at 6 AM, before 5 PM)
+
+This approach ensures that only **after-hours on-call burden** is measured, not business-hours coverage.
 
 ## Usage
 

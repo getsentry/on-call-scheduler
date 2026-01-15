@@ -191,6 +191,10 @@ def check(
         if verbose:
             click.echo("API connection successful\n", err=True)
 
+        # Get user timezone configuration
+        user_timezones = settings.get_user_timezones()
+        workday_end_hour = settings.workday_end_hour
+
         # Run analysis
         if months > 1:
             result = analyze_multiple_months(
@@ -200,6 +204,8 @@ def check(
                 num_months=months,
                 max_days=max_days_limit,
                 client=client,
+                workday_end_hour=workday_end_hour,
+                user_timezones=user_timezones,
             )
 
             # Display results
@@ -217,6 +223,8 @@ def check(
                 year=target_year,
                 max_days=max_days_limit,
                 client=client,
+                workday_end_hour=workday_end_hour,
+                user_timezones=user_timezones,
             )
 
             # Display results

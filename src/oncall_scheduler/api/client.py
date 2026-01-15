@@ -3,7 +3,7 @@
 import logging
 import time
 from datetime import datetime
-from typing import List
+from typing import Dict, List
 
 import pagerduty
 
@@ -137,7 +137,11 @@ class PagerDutyClient:
         return schedules
 
     def get_oncalls(
-        self, schedule_ids: List[str], since: datetime, until: datetime
+        self,
+        schedule_ids: List[str],
+        since: datetime,
+        until: datetime,
+        user_timezones: Dict[str, str] = None,
     ) -> List[ScheduleEntry]:
         """Fetch on-call entries for specified schedules and time range.
 
@@ -145,6 +149,7 @@ class PagerDutyClient:
             schedule_ids: List of PagerDuty schedule IDs
             since: Start datetime for the query
             until: End datetime for the query
+            user_timezones: Optional mapping of user emails to timezone strings
 
         Returns:
             List of ScheduleEntry objects
@@ -154,6 +159,9 @@ class PagerDutyClient:
             ResourceNotFoundError: If a schedule is not found
             PagerDutyAPIError: For other API errors
         """
+        if user_timezones is None:
+            user_timezones = {}
+
         client = self._get_client()
 
         def _fetch_oncalls():
@@ -173,11 +181,17 @@ class PagerDutyClient:
 
                 for oncall_data in response:
                     try:
-                        entry = ScheduleEntry.from_oncall_response(oncall_data)
+                        # Get user email for timezone lookup
+                        user_email = oncall_data.get("user", {}).get("email", "")
+                        user_tz = user_timezones.get(user_email)
+
+                        entry = ScheduleEntry.from_oncall_response(
+                            oncall_data, user_timezone_override=user_tz
+                        )
                         entries.append(entry)
                         logger.debug(
-                            f"On-call entry: {entry.user.name} on {entry.schedule.name} "
-                            f"from {entry.start} to {entry.end}"
+                            f"On-call entry: {entry.user.name} ({entry.user.timezone}) "
+                            f"on {entry.schedule.name} from {entry.start} to {entry.end}"
                         )
                     except (KeyError, ValueError) as e:
                         logger.warning(f"Skipping invalid on-call entry: {e}")

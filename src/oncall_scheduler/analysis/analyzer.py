@@ -4,7 +4,7 @@ import calendar
 import logging
 from collections import defaultdict
 from datetime import datetime
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 import pytz
 
@@ -27,15 +27,22 @@ def analyze_schedules(
     year: int,
     max_days: int,
     client: PagerDutyClient,
+    workday_end_hour: int = 17,
+    user_timezones: Optional[Dict[str, str]] = None,
 ) -> AnalysisResult:
     """Analyze on-call schedules for teams and identify users over the limit.
+
+    Only counts days where users have on-call coverage extending past the
+    workday end hour in their local timezone.
 
     Args:
         team_ids: List of PagerDuty team IDs to analyze
         month: Target month (1-12)
         year: Target year
-        max_days: Maximum allowed on-call days per month
+        max_days: Maximum allowed after-hours on-call days per month
         client: PagerDutyClient instance for API calls
+        workday_end_hour: Hour (0-23) when standard workday ends (default: 17 for 5 PM)
+        user_timezones: Optional mapping of user emails to timezone strings
 
     Returns:
         AnalysisResult containing categorized user reports
@@ -44,8 +51,14 @@ def analyze_schedules(
         AuthenticationError: If API authentication fails
         PagerDutyAPIError: For other API errors
     """
+    if user_timezones is None:
+        user_timezones = {}
+
     logger.info(f"Starting analysis for {len(team_ids)} teams in {month}/{year}")
     logger.info(f"Maximum days limit: {max_days}")
+    logger.info(f"Workday end hour: {workday_end_hour}:00")
+    if user_timezones:
+        logger.info(f"User timezone overrides configured for {len(user_timezones)} users")
 
     # Step 1: Fetch schedules for the specified teams
     schedules = client.get_schedules_by_team(team_ids)
@@ -66,15 +79,15 @@ def analyze_schedules(
     month_start = pytz.utc.localize(month_start)
     month_end = pytz.utc.localize(month_end)
 
-    # Step 3: Fetch on-call entries for the month
-    entries = client.get_oncalls(schedule_ids, month_start, month_end)
+    # Step 3: Fetch on-call entries for the month with user timezone configuration
+    entries = client.get_oncalls(schedule_ids, month_start, month_end, user_timezones)
 
     if not entries:
         logger.warning(f"No on-call entries found for the specified period")
         return AnalysisResult(month=month, year=year, max_days=max_days)
 
-    # Step 4: Calculate days per user
-    user_days = calculate_oncall_days(entries, month, year)
+    # Step 4: Calculate days per user (only after-hours coverage)
+    user_days = calculate_oncall_days(entries, month, year, workday_end_hour)
 
     # Step 5: Build a mapping of user_id to User object and schedule names
     users: Dict[str, User] = {}
@@ -146,16 +159,23 @@ def analyze_multiple_months(
     num_months: int,
     max_days: int,
     client: PagerDutyClient,
+    workday_end_hour: int = 17,
+    user_timezones: Optional[Dict[str, str]] = None,
 ) -> MultiMonthAnalysisResult:
     """Analyze on-call schedules for multiple consecutive months.
+
+    Only counts days where users have on-call coverage extending past the
+    workday end hour in their local timezone.
 
     Args:
         team_ids: List of PagerDuty team IDs to analyze
         start_month: Starting month (1-12)
         start_year: Starting year
         num_months: Number of months to analyze
-        max_days: Maximum allowed on-call days per month
+        max_days: Maximum allowed after-hours on-call days per month
         client: PagerDutyClient instance for API calls
+        workday_end_hour: Hour (0-23) when standard workday ends (default: 17 for 5 PM)
+        user_timezones: Optional mapping of user emails to timezone strings
 
     Returns:
         MultiMonthAnalysisResult containing results for each month
@@ -173,6 +193,8 @@ def analyze_multiple_months(
             year=current_year,
             max_days=max_days,
             client=client,
+            workday_end_hour=workday_end_hour,
+            user_timezones=user_timezones,
         )
         results.append(result)
 

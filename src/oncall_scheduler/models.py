@@ -13,15 +13,22 @@ class User:
     name: str
     email: str
     html_url: Optional[str] = None
+    timezone: str = "UTC"
 
     @classmethod
-    def from_api_response(cls, data: dict) -> "User":
-        """Create a User from PagerDuty API response data."""
+    def from_api_response(cls, data: dict, default_timezone: str = "UTC") -> "User":
+        """Create a User from PagerDuty API response data.
+
+        Args:
+            data: User data from PagerDuty API
+            default_timezone: Default timezone to use if not specified in data
+        """
         return cls(
             id=data["id"],
             name=data.get("summary", data.get("name", "Unknown")),
             email=data.get("email", ""),
             html_url=data.get("html_url"),
+            timezone=data.get("time_zone", default_timezone),
         )
 
 
@@ -55,11 +62,20 @@ class ScheduleEntry:
     end: datetime
 
     @classmethod
-    def from_oncall_response(cls, data: dict) -> "ScheduleEntry":
-        """Create a ScheduleEntry from PagerDuty oncalls API response data."""
+    def from_oncall_response(cls, data: dict, user_timezone_override: Optional[str] = None) -> "ScheduleEntry":
+        """Create a ScheduleEntry from PagerDuty oncalls API response data.
+
+        Args:
+            data: Oncall data from PagerDuty API
+            user_timezone_override: Optional timezone to use for the user (overrides API data)
+        """
+        # Use schedule timezone as default for user if not specified
+        schedule = Schedule.from_api_response(data["schedule"])
+        default_tz = user_timezone_override or schedule.timezone
+
         return cls(
-            user=User.from_api_response(data["user"]),
-            schedule=Schedule.from_api_response(data["schedule"]),
+            user=User.from_api_response(data["user"], default_timezone=default_tz),
+            schedule=schedule,
             start=datetime.fromisoformat(data["start"].replace("Z", "+00:00")),
             end=datetime.fromisoformat(data["end"].replace("Z", "+00:00")),
         )
@@ -82,6 +98,7 @@ class OnCallReport:
                 "name": self.user.name,
                 "email": self.user.email,
                 "html_url": self.user.html_url,
+                "timezone": self.user.timezone,
             },
             "schedule_name": self.schedule_name,
             "total_days": self.total_days,
