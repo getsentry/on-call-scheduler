@@ -25,7 +25,7 @@ A Python CLI tool for analyzing PagerDuty on-call schedules and identifying team
 
 ```bash
 # Clone the repository
-git clone <repository-url>
+git clone https://github.com/getsentry/on-call-scheduler.git
 cd on-call-scheduler
 
 # Install dependencies using uv
