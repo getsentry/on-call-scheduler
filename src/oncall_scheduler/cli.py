@@ -120,6 +120,13 @@ def cli():
     is_flag=True,
     help="Enable verbose output (show all users including under limit)",
 )
+@click.option(
+    "--timezone",
+    "-z",
+    "timezones",
+    multiple=True,
+    help="Only include users in specified timezones (can be specified multiple times, e.g. --timezone America/New_York --timezone Europe/London)",
+)
 def check(
     teams: tuple,
     max_days: Optional[int],
@@ -128,6 +135,7 @@ def check(
     months: int,
     output: str,
     verbose: bool,
+    timezones: tuple,
 ):
     """Check on-call schedules and identify users over the limit."""
     # Setup logging
@@ -166,6 +174,9 @@ def check(
     # Determine max days (CLI arg takes precedence)
     max_days_limit = max_days if max_days is not None else settings.oncall_max_days
 
+    # Determine timezones of concern (CLI args take precedence over config)
+    timezones_of_concern_list: List[str] = list(timezones) if timezones else settings.get_timezones_of_concern()
+
     # Determine month and year (default to current)
     now = datetime.now()
     target_month = month if month is not None else now.month
@@ -178,6 +189,8 @@ def check(
         else:
             click.echo(f"Period: {target_month}/{target_year}", err=True)
         click.echo(f"Max days: {max_days_limit}", err=True)
+        if timezones_of_concern_list:
+            click.echo(f"Timezones of concern: {', '.join(timezones_of_concern_list)}", err=True)
         click.echo("", err=True)
 
     try:
@@ -206,6 +219,7 @@ def check(
                 client=client,
                 workday_end_hour=workday_end_hour,
                 user_timezones=user_timezones,
+                timezones_of_concern=timezones_of_concern_list,
             )
 
             # Display results
@@ -225,6 +239,7 @@ def check(
                 client=client,
                 workday_end_hour=workday_end_hour,
                 user_timezones=user_timezones,
+                timezones_of_concern=timezones_of_concern_list,
             )
 
             # Display results

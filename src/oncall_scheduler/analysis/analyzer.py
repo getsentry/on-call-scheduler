@@ -29,6 +29,7 @@ def analyze_schedules(
     client: PagerDutyClient,
     workday_end_hour: int = 17,
     user_timezones: Optional[Dict[str, str]] = None,
+    timezones_of_concern: Optional[List[str]] = None,
 ) -> AnalysisResult:
     """Analyze on-call schedules for teams and identify users over the limit.
 
@@ -43,6 +44,7 @@ def analyze_schedules(
         client: PagerDutyClient instance for API calls
         workday_end_hour: Hour (0-23) when standard workday ends (default: 17 for 5 PM)
         user_timezones: Optional mapping of user emails to timezone strings
+        timezones_of_concern: Optional list of timezones to include (empty list means all timezones included)
 
     Returns:
         AnalysisResult containing categorized user reports
@@ -53,12 +55,16 @@ def analyze_schedules(
     """
     if user_timezones is None:
         user_timezones = {}
+    if timezones_of_concern is None:
+        timezones_of_concern = []
 
     logger.info(f"Starting analysis for {len(team_ids)} teams in {month}/{year}")
     logger.info(f"Maximum days limit: {max_days}")
     logger.info(f"Workday end hour: {workday_end_hour}:00")
     if user_timezones:
         logger.info(f"User timezone overrides configured for {len(user_timezones)} users")
+    if timezones_of_concern:
+        logger.info(f"Filtering to timezones: {', '.join(timezones_of_concern)}")
 
     # Step 1: Fetch schedules for the specified teams
     schedules = client.get_schedules_by_team(team_ids)
@@ -108,6 +114,12 @@ def analyze_schedules(
     for user_id, dates in user_days.items():
         day_count = len(dates)
         user = users[user_id]
+
+        # Filter by timezone if timezones_of_concern is specified
+        if timezones_of_concern and user.timezone not in timezones_of_concern:
+            logger.debug(f"FILTERED: {user.name} - timezone {user.timezone} not in timezones of concern")
+            continue
+
         schedule_names = ", ".join(user_schedules[user_id])
 
         # Get sorted list of dates for reporting
@@ -161,6 +173,7 @@ def analyze_multiple_months(
     client: PagerDutyClient,
     workday_end_hour: int = 17,
     user_timezones: Optional[Dict[str, str]] = None,
+    timezones_of_concern: Optional[List[str]] = None,
 ) -> MultiMonthAnalysisResult:
     """Analyze on-call schedules for multiple consecutive months.
 
@@ -176,10 +189,14 @@ def analyze_multiple_months(
         client: PagerDutyClient instance for API calls
         workday_end_hour: Hour (0-23) when standard workday ends (default: 17 for 5 PM)
         user_timezones: Optional mapping of user emails to timezone strings
+        timezones_of_concern: Optional list of timezones to include (empty list means all timezones included)
 
     Returns:
         MultiMonthAnalysisResult containing results for each month
     """
+    if timezones_of_concern is None:
+        timezones_of_concern = []
+
     logger.info(f"Analyzing {num_months} months starting from {start_month}/{start_year}")
 
     results = []
@@ -195,6 +212,7 @@ def analyze_multiple_months(
             client=client,
             workday_end_hour=workday_end_hour,
             user_timezones=user_timezones,
+            timezones_of_concern=timezones_of_concern,
         )
         results.append(result)
 

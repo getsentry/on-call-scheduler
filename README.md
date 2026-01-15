@@ -352,7 +352,7 @@ Warning: No schedules found for teams: [PXXXXXX]
 
 ## License
 
-MIT
+Apache-2.0
 
 ## Contributing
 

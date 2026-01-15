@@ -66,6 +66,12 @@ class Settings(BaseSettings):
         validation_alias="WORKDAY_END_HOUR",
     )
 
+    timezones_of_concern: Optional[str] = Field(
+        default=None,
+        description="Comma-separated list of timezones to include in analysis (e.g. 'America/New_York,Europe/London'). If not specified, all timezones are included.",
+        validation_alias="TIMEZONES_OF_CONCERN",
+    )
+
     def get_team_ids(self) -> List[str]:
         """Parse and return team IDs as a list."""
         if not self.pagerduty_team_ids:
@@ -96,6 +102,16 @@ class Settings(BaseSettings):
         """
         user_tz_map = self.get_user_timezones()
         return user_tz_map.get(email, self.timezone)
+
+    def get_timezones_of_concern(self) -> List[str]:
+        """Parse and return timezones of concern as a list.
+
+        Returns:
+            List of timezone strings to include in analysis. Empty list means all timezones are included.
+        """
+        if not self.timezones_of_concern:
+            return []
+        return [tz.strip() for tz in self.timezones_of_concern.split(",")]
 
 
 def load_settings() -> Settings:
