@@ -127,6 +127,13 @@ def cli():
     multiple=True,
     help="Only include users in specified timezones (can be specified multiple times, e.g. --timezone America/New_York --timezone Europe/London)",
 )
+@click.option(
+    "--exclude-user",
+    "-e",
+    "excluded_users",
+    multiple=True,
+    help="Exclude specific users from over-limit reporting (can be specified multiple times, e.g. --exclude-user user1@example.com --exclude-user user2@example.com)",
+)
 def check(
     teams: tuple,
     max_days: Optional[int],
@@ -136,6 +143,7 @@ def check(
     output: str,
     verbose: bool,
     timezones: tuple,
+    excluded_users: tuple,
 ):
     """Check on-call schedules and identify users over the limit."""
     # Setup logging
@@ -177,6 +185,9 @@ def check(
     # Determine timezones of concern (CLI args take precedence over config)
     timezones_of_concern_list: List[str] = list(timezones) if timezones else settings.get_timezones_of_concern()
 
+    # Determine excluded users (CLI args take precedence over config)
+    excluded_users_list: List[str] = list(excluded_users) if excluded_users else settings.get_excluded_users()
+
     # Determine month and year (default to current)
     now = datetime.now()
     target_month = month if month is not None else now.month
@@ -191,6 +202,8 @@ def check(
         click.echo(f"Max days: {max_days_limit}", err=True)
         if timezones_of_concern_list:
             click.echo(f"Timezones of concern: {', '.join(timezones_of_concern_list)}", err=True)
+        if excluded_users_list:
+            click.echo(f"Excluded users: {', '.join(excluded_users_list)}", err=True)
         click.echo("", err=True)
 
     try:
@@ -220,6 +233,7 @@ def check(
                 workday_end_hour=workday_end_hour,
                 user_timezones=user_timezones,
                 timezones_of_concern=timezones_of_concern_list,
+                excluded_users=excluded_users_list,
             )
 
             # Display results
@@ -240,6 +254,7 @@ def check(
                 workday_end_hour=workday_end_hour,
                 user_timezones=user_timezones,
                 timezones_of_concern=timezones_of_concern_list,
+                excluded_users=excluded_users_list,
             )
 
             # Display results

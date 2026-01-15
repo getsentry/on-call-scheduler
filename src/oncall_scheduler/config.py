@@ -72,6 +72,12 @@ class Settings(BaseSettings):
         validation_alias="TIMEZONES_OF_CONCERN",
     )
 
+    excluded_users: Optional[str] = Field(
+        default=None,
+        description="Comma-separated list of user emails to exclude from over-limit reporting (e.g. 'user1@example.com,user2@example.com').",
+        validation_alias="EXCLUDED_USERS",
+    )
+
     def get_team_ids(self) -> List[str]:
         """Parse and return team IDs as a list."""
         if not self.pagerduty_team_ids:
@@ -112,6 +118,16 @@ class Settings(BaseSettings):
         if not self.timezones_of_concern:
             return []
         return [tz.strip() for tz in self.timezones_of_concern.split(",")]
+
+    def get_excluded_users(self) -> List[str]:
+        """Parse and return excluded users as a list.
+
+        Returns:
+            List of user emails to exclude from over-limit reporting. Empty list means no users are excluded.
+        """
+        if not self.excluded_users:
+            return []
+        return [email.strip() for email in self.excluded_users.split(",")]
 
 
 def load_settings() -> Settings:

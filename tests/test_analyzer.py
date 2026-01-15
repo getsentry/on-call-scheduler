@@ -292,3 +292,38 @@ class TestAnalyzeSchedules:
         assert since.year == 2026
         assert until.month == 2
         assert until.year == 2026
+
+    def test_analyze_schedules_excluded_users(self):
+        """Test that excluded users are filtered from the results."""
+        user1 = User(id="PUSER1", name="User One", email="user1@example.com")
+        user2 = User(id="PUSER2", name="User Two", email="user2@example.com")
+        user3 = User(id="PUSER3", name="User Three", email="user3@example.com")
+        schedule = Schedule(id="PSCHED1", name="Test Schedule", timezone="UTC")
+
+        entries = []
+
+        # All three users: 15 days (over limit)
+        for user in [user1, user2, user3]:
+            for day in range(1, 16):
+                start = pytz.utc.localize(datetime(2026, 1, day, 0, 0, 0))
+                end = pytz.utc.localize(datetime(2026, 1, day, 23, 59, 59))
+                entries.append(ScheduleEntry(user=user, schedule=schedule, start=start, end=end))
+
+        mock_client = Mock()
+        mock_client.get_schedules_by_team.return_value = [schedule]
+        mock_client.get_oncalls.return_value = entries
+
+        # Exclude user1 and user2
+        result = analyze_schedules(
+            team_ids=["TEAM1"],
+            month=1,
+            year=2026,
+            max_days=10,
+            client=mock_client,
+            excluded_users=["user1@example.com", "user2@example.com"],
+        )
+
+        # Only user3 should appear (user1 and user2 are excluded)
+        assert len(result.over_limit) == 1
+        assert result.over_limit[0].user.id == "PUSER3"
+        assert result.over_limit[0].user.email == "user3@example.com"
