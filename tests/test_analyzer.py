@@ -327,3 +327,93 @@ class TestAnalyzeSchedules:
         assert len(result.over_limit) == 1
         assert result.over_limit[0].user.id == "PUSER3"
         assert result.over_limit[0].user.email == "user3@example.com"
+
+    def test_analyze_schedules_excluded_schedules_by_id(self):
+        """Test that schedules can be excluded by ID."""
+        user = User(id="PUSER1", name="Test User", email="test@example.com")
+        schedule1 = Schedule(id="PSCHED1", name="Primary Schedule", timezone="UTC")
+        schedule2 = Schedule(id="PSCHED2", name="Secondary Schedule", timezone="UTC")
+
+        entries = []
+
+        # User on schedule 1 for 15 days (over limit)
+        for day in range(1, 16):
+            start = pytz.utc.localize(datetime(2026, 1, day, 0, 0, 0))
+            end = pytz.utc.localize(datetime(2026, 1, day, 23, 59, 59))
+            entries.append(ScheduleEntry(user=user, schedule=schedule1, start=start, end=end))
+
+        # User on schedule 2 for 5 days (would be 20 days total if both counted)
+        for day in range(16, 21):
+            start = pytz.utc.localize(datetime(2026, 1, day, 0, 0, 0))
+            end = pytz.utc.localize(datetime(2026, 1, day, 23, 59, 59))
+            entries.append(ScheduleEntry(user=user, schedule=schedule2, start=start, end=end))
+
+        mock_client = Mock()
+        mock_client.get_schedules_by_team.return_value = [schedule1, schedule2]
+        mock_client.get_oncalls.return_value = entries
+
+        # Exclude schedule2 by ID
+        result = analyze_schedules(
+            team_ids=["TEAM1"],
+            month=1,
+            year=2026,
+            max_days=10,
+            client=mock_client,
+            excluded_schedules=["PSCHED2"],
+        )
+
+        # Should only analyze schedule1 (15 days, over limit)
+        # Schedule2 should be filtered out before fetching on-calls
+        mock_client.get_oncalls.assert_called_once()
+        call_args = mock_client.get_oncalls.call_args
+        schedule_ids = call_args[0][0]
+        assert schedule_ids == ["PSCHED1"]  # Only schedule1
+
+    def test_analyze_schedules_excluded_schedules_by_name(self):
+        """Test that schedules can be excluded by name."""
+        user = User(id="PUSER1", name="Test User", email="test@example.com")
+        schedule1 = Schedule(id="PSCHED1", name="Primary Schedule", timezone="UTC")
+        schedule2 = Schedule(id="PSCHED2", name="Secondary Schedule", timezone="UTC")
+
+        mock_client = Mock()
+        mock_client.get_schedules_by_team.return_value = [schedule1, schedule2]
+        mock_client.get_oncalls.return_value = []
+
+        # Exclude schedule1 by name
+        result = analyze_schedules(
+            team_ids=["TEAM1"],
+            month=1,
+            year=2026,
+            max_days=10,
+            client=mock_client,
+            excluded_schedules=["Primary Schedule"],
+        )
+
+        # Should only analyze schedule2
+        call_args = mock_client.get_oncalls.call_args
+        schedule_ids = call_args[0][0]
+        assert schedule_ids == ["PSCHED2"]  # Only schedule2
+
+    def test_analyze_schedules_all_schedules_excluded(self):
+        """Test analysis when all schedules are excluded."""
+        schedule1 = Schedule(id="PSCHED1", name="Primary Schedule", timezone="UTC")
+        schedule2 = Schedule(id="PSCHED2", name="Secondary Schedule", timezone="UTC")
+
+        mock_client = Mock()
+        mock_client.get_schedules_by_team.return_value = [schedule1, schedule2]
+
+        # Exclude all schedules
+        result = analyze_schedules(
+            team_ids=["TEAM1"],
+            month=1,
+            year=2026,
+            max_days=10,
+            client=mock_client,
+            excluded_schedules=["PSCHED1", "PSCHED2"],
+        )
+
+        # Should return empty result without calling get_oncalls
+        assert len(result.over_limit) == 0
+        assert len(result.at_limit) == 0
+        assert len(result.under_limit) == 0
+        mock_client.get_oncalls.assert_not_called()
