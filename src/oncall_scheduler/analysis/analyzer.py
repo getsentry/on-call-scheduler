@@ -31,6 +31,7 @@ def analyze_schedules(
     user_timezones: Optional[Dict[str, str]] = None,
     timezones_of_concern: Optional[List[str]] = None,
     excluded_users: Optional[List[str]] = None,
+    excluded_schedules: Optional[List[str]] = None,
 ) -> AnalysisResult:
     """Analyze on-call schedules for teams and identify users over the limit.
 
@@ -47,6 +48,7 @@ def analyze_schedules(
         user_timezones: Optional mapping of user emails to timezone strings
         timezones_of_concern: Optional list of timezones to include (empty list means all timezones included)
         excluded_users: Optional list of user emails to exclude from over-limit reporting
+        excluded_schedules: Optional list of schedule IDs or names to exclude from analysis
 
     Returns:
         AnalysisResult containing categorized user reports
@@ -61,6 +63,8 @@ def analyze_schedules(
         timezones_of_concern = []
     if excluded_users is None:
         excluded_users = []
+    if excluded_schedules is None:
+        excluded_schedules = []
 
     logger.info(f"Starting analysis for {len(team_ids)} teams in {month}/{year}")
     logger.info(f"Maximum days limit: {max_days}")
@@ -71,12 +75,26 @@ def analyze_schedules(
         logger.info(f"Filtering to timezones: {', '.join(timezones_of_concern)}")
     if excluded_users:
         logger.info(f"Excluding users: {', '.join(excluded_users)}")
+    if excluded_schedules:
+        logger.info(f"Excluding schedules: {', '.join(excluded_schedules)}")
 
     # Step 1: Fetch schedules for the specified teams
-    schedules = client.get_schedules_by_team(team_ids)
+    all_schedules = client.get_schedules_by_team(team_ids)
+
+    if not all_schedules:
+        logger.warning(f"No schedules found for teams: {team_ids}")
+        return AnalysisResult(month=month, year=year, max_days=max_days)
+
+    # Filter out excluded schedules (by ID or name)
+    schedules = []
+    for schedule in all_schedules:
+        if schedule.id in excluded_schedules or schedule.name in excluded_schedules:
+            logger.info(f"EXCLUDED SCHEDULE: {schedule.name} ({schedule.id})")
+        else:
+            schedules.append(schedule)
 
     if not schedules:
-        logger.warning(f"No schedules found for teams: {team_ids}")
+        logger.warning(f"No schedules remaining after exclusions")
         return AnalysisResult(month=month, year=year, max_days=max_days)
 
     schedule_ids = [schedule.id for schedule in schedules]
@@ -186,6 +204,7 @@ def analyze_multiple_months(
     user_timezones: Optional[Dict[str, str]] = None,
     timezones_of_concern: Optional[List[str]] = None,
     excluded_users: Optional[List[str]] = None,
+    excluded_schedules: Optional[List[str]] = None,
 ) -> MultiMonthAnalysisResult:
     """Analyze on-call schedules for multiple consecutive months.
 
@@ -203,6 +222,7 @@ def analyze_multiple_months(
         user_timezones: Optional mapping of user emails to timezone strings
         timezones_of_concern: Optional list of timezones to include (empty list means all timezones included)
         excluded_users: Optional list of user emails to exclude from over-limit reporting
+        excluded_schedules: Optional list of schedule IDs or names to exclude from analysis
 
     Returns:
         MultiMonthAnalysisResult containing results for each month
@@ -211,6 +231,8 @@ def analyze_multiple_months(
         timezones_of_concern = []
     if excluded_users is None:
         excluded_users = []
+    if excluded_schedules is None:
+        excluded_schedules = []
 
     logger.info(f"Analyzing {num_months} months starting from {start_month}/{start_year}")
 
@@ -229,6 +251,7 @@ def analyze_multiple_months(
             user_timezones=user_timezones,
             timezones_of_concern=timezones_of_concern,
             excluded_users=excluded_users,
+            excluded_schedules=excluded_schedules,
         )
         results.append(result)
 

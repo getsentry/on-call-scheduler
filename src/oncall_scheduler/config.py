@@ -78,6 +78,12 @@ class Settings(BaseSettings):
         validation_alias="EXCLUDED_USERS",
     )
 
+    excluded_schedules: Optional[str] = Field(
+        default=None,
+        description="Comma-separated list of schedule IDs or names to exclude from analysis (e.g. 'SCHEDULE1,SCHEDULE2' or 'Primary On-Call,Secondary').",
+        validation_alias="EXCLUDED_SCHEDULES",
+    )
+
     def get_team_ids(self) -> List[str]:
         """Parse and return team IDs as a list."""
         if not self.pagerduty_team_ids:
@@ -128,6 +134,16 @@ class Settings(BaseSettings):
         if not self.excluded_users:
             return []
         return [email.strip() for email in self.excluded_users.split(",")]
+
+    def get_excluded_schedules(self) -> List[str]:
+        """Parse and return excluded schedules as a list.
+
+        Returns:
+            List of schedule IDs or names to exclude from analysis. Empty list means no schedules are excluded.
+        """
+        if not self.excluded_schedules:
+            return []
+        return [schedule.strip() for schedule in self.excluded_schedules.split(",")]
 
 
 def load_settings() -> Settings:

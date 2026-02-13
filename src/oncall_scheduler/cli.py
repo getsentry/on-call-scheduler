@@ -134,6 +134,13 @@ def cli():
     multiple=True,
     help="Exclude specific users from over-limit reporting (can be specified multiple times, e.g. --exclude-user user1@example.com --exclude-user user2@example.com)",
 )
+@click.option(
+    "--exclude-schedule",
+    "-s",
+    "excluded_schedules",
+    multiple=True,
+    help="Exclude specific schedules from analysis by ID or name (can be specified multiple times, e.g. --exclude-schedule SCHEDULE1 --exclude-schedule 'Primary On-Call')",
+)
 def check(
     teams: tuple,
     max_days: Optional[int],
@@ -144,6 +151,7 @@ def check(
     verbose: bool,
     timezones: tuple,
     excluded_users: tuple,
+    excluded_schedules: tuple,
 ):
     """Check on-call schedules and identify users over the limit."""
     # Setup logging
@@ -188,6 +196,9 @@ def check(
     # Determine excluded users (CLI args take precedence over config)
     excluded_users_list: List[str] = list(excluded_users) if excluded_users else settings.get_excluded_users()
 
+    # Determine excluded schedules (CLI args take precedence over config)
+    excluded_schedules_list: List[str] = list(excluded_schedules) if excluded_schedules else settings.get_excluded_schedules()
+
     # Determine month and year (default to current)
     now = datetime.now()
     target_month = month if month is not None else now.month
@@ -204,6 +215,8 @@ def check(
             click.echo(f"Timezones of concern: {', '.join(timezones_of_concern_list)}", err=True)
         if excluded_users_list:
             click.echo(f"Excluded users: {', '.join(excluded_users_list)}", err=True)
+        if excluded_schedules_list:
+            click.echo(f"Excluded schedules: {', '.join(excluded_schedules_list)}", err=True)
         click.echo("", err=True)
 
     try:
@@ -234,6 +247,7 @@ def check(
                 user_timezones=user_timezones,
                 timezones_of_concern=timezones_of_concern_list,
                 excluded_users=excluded_users_list,
+                excluded_schedules=excluded_schedules_list,
             )
 
             # Display results
@@ -255,6 +269,7 @@ def check(
                 user_timezones=user_timezones,
                 timezones_of_concern=timezones_of_concern_list,
                 excluded_users=excluded_users_list,
+                excluded_schedules=excluded_schedules_list,
             )
 
             # Display results

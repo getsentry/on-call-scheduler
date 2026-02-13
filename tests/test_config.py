@@ -176,3 +176,50 @@ class TestLoadSettings:
         """Test load_settings with missing required fields."""
         with pytest.raises(ValidationError):
             load_settings()
+
+    def test_get_excluded_schedules_empty(self):
+        """Test get_excluded_schedules with no schedules excluded."""
+        settings = Settings(
+            pagerduty_api_key="test_key",
+            pagerduty_from_email="test@example.com"
+        )
+
+        excluded_schedules = settings.get_excluded_schedules()
+
+        assert excluded_schedules == []
+
+    def test_get_excluded_schedules_single(self):
+        """Test get_excluded_schedules with a single schedule."""
+        settings = Settings(
+            pagerduty_api_key="test_key",
+            pagerduty_from_email="test@example.com",
+            excluded_schedules="SCHEDULE1",
+        )
+
+        excluded_schedules = settings.get_excluded_schedules()
+
+        assert excluded_schedules == ["SCHEDULE1"]
+
+    def test_get_excluded_schedules_multiple(self):
+        """Test get_excluded_schedules with multiple schedules."""
+        settings = Settings(
+            pagerduty_api_key="test_key",
+            pagerduty_from_email="test@example.com",
+            excluded_schedules="SCHEDULE1,SCHEDULE2,Primary On-Call",
+        )
+
+        excluded_schedules = settings.get_excluded_schedules()
+
+        assert excluded_schedules == ["SCHEDULE1", "SCHEDULE2", "Primary On-Call"]
+
+    def test_get_excluded_schedules_with_spaces(self):
+        """Test get_excluded_schedules strips whitespace from schedule identifiers."""
+        settings = Settings(
+            pagerduty_api_key="test_key",
+            pagerduty_from_email="test@example.com",
+            excluded_schedules="SCHEDULE1 , SCHEDULE2 ,  Primary On-Call",
+        )
+
+        excluded_schedules = settings.get_excluded_schedules()
+
+        assert excluded_schedules == ["SCHEDULE1", "SCHEDULE2", "Primary On-Call"]
