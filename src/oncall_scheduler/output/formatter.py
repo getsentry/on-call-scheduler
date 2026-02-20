@@ -41,6 +41,48 @@ def _format_date_ranges(dates: List[date]) -> str:
     return ", ".join(ranges)
 
 
+def _add_pto_conflict_row(
+    table: Table,
+    conflict: PTOConflict,
+    month_label: str | None = None,
+) -> None:
+    """Add a PTO conflict row to a table.
+
+    Args:
+        table: Rich Table to add the row to
+        conflict: PTOConflict object
+        month_label: Optional month label for multi-month tables
+    """
+    row = [
+        f"[magenta]{conflict.user.name}[/magenta]",
+        f"[magenta bold]{len(conflict.conflicting_dates)}[/magenta bold]",
+        f"[magenta]{conflict.schedule_name}[/magenta]",
+        f"[magenta]{_format_date_ranges(conflict.conflicting_dates)}[/magenta]",
+    ]
+    if month_label is not None:
+        row.insert(0, f"[magenta]{month_label}[/magenta]")
+    table.add_row(*row)
+
+
+def _create_pto_conflicts_table(include_month_column: bool = False) -> Table:
+    """Create a PTO conflicts table with appropriate columns.
+
+    Args:
+        include_month_column: Whether to include a Month column
+
+    Returns:
+        Configured Rich Table
+    """
+    table = Table(show_header=True, header_style="bold")
+    if include_month_column:
+        table.add_column("Month")
+    table.add_column("User")
+    table.add_column("Conflicts", justify="center")
+    table.add_column("Schedule")
+    table.add_column("Conflicting Dates")
+    return table
+
+
 def _format_pto_conflicts_table(conflicts: List[PTOConflict], console: Console, month_label: str | None = None) -> None:
     """Format and display PTO conflicts as a Rich table.
 
@@ -56,24 +98,10 @@ def _format_pto_conflicts_table(conflicts: List[PTOConflict], console: Console, 
     console.print("[bold magenta]PTO Conflicts - On-Call Days Needing Adjustment[/bold magenta]")
     console.print()
 
-    table = Table(show_header=True, header_style="bold")
-    if month_label is not None:
-        table.add_column("Month")
-    table.add_column("User")
-    table.add_column("Conflicts", justify="center")
-    table.add_column("Schedule")
-    table.add_column("Conflicting Dates")
+    table = _create_pto_conflicts_table(include_month_column=month_label is not None)
 
     for conflict in conflicts:
-        row = [
-            f"[magenta]{conflict.user.name}[/magenta]",
-            f"[magenta bold]{len(conflict.conflicting_dates)}[/magenta bold]",
-            f"[magenta]{conflict.schedule_name}[/magenta]",
-            f"[magenta]{_format_date_ranges(conflict.conflicting_dates)}[/magenta]",
-        ]
-        if month_label is not None:
-            row.insert(0, f"[magenta]{month_label}[/magenta]")
-        table.add_row(*row)
+        _add_pto_conflict_row(table, conflict, month_label)
 
     console.print(table)
 
@@ -96,25 +124,14 @@ def _format_multi_month_pto_conflicts_table(results: List[AnalysisResult], conso
     console.print("[bold magenta]PTO Conflicts - On-Call Days Needing Adjustment[/bold magenta]")
     console.print()
 
-    pto_table = Table(show_header=True, header_style="bold")
-    pto_table.add_column("Month")
-    pto_table.add_column("User")
-    pto_table.add_column("Conflicts", justify="center")
-    pto_table.add_column("Schedule")
-    pto_table.add_column("Conflicting Dates")
+    table = _create_pto_conflicts_table(include_month_column=True)
 
     for month_result in results:
         month_label = f"{calendar.month_abbr[month_result.month]} {month_result.year}"
         for conflict in month_result.pto_conflicts:
-            pto_table.add_row(
-                f"[magenta]{month_label}[/magenta]",
-                f"[magenta]{conflict.user.name}[/magenta]",
-                f"[magenta bold]{len(conflict.conflicting_dates)}[/magenta bold]",
-                f"[magenta]{conflict.schedule_name}[/magenta]",
-                f"[magenta]{_format_date_ranges(conflict.conflicting_dates)}[/magenta]",
-            )
+            _add_pto_conflict_row(table, conflict, month_label)
 
-    console.print(pto_table)
+    console.print(table)
     return total_pto_conflicts
 
 
