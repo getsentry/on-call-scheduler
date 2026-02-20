@@ -146,7 +146,7 @@ def analyze_schedules(
     pto_by_email: Optional[Dict[str, List[PTOEntry]]] = None,
     holidays_by_timezone: Optional[Dict[str, List[HolidayEntry]]] = None,
     business_hours_schedules: Optional[List[str]] = None,
-    dummy_user_name: str = "Dummy User",
+    dummy_user_id: Optional[str] = None,
 ) -> AnalysisResult:
     """Analyze on-call schedules for teams and identify users over the limit.
 
@@ -154,7 +154,7 @@ def analyze_schedules(
     workday end hour in their local timezone.
 
     For business hours schedules, users who are on PTO or holiday will have
-    their days reassigned to a dummy user placeholder.
+    schedule overrides created to assign the dummy user.
 
     Args:
         team_ids: List of PagerDuty team IDs to analyze
@@ -169,8 +169,8 @@ def analyze_schedules(
         excluded_schedules: Optional list of schedule IDs or names to exclude from analysis
         pto_by_email: Optional dict mapping user emails to lists of PTO entries
         holidays_by_timezone: Optional dict mapping timezones to lists of holidays
-        business_hours_schedules: Optional list of schedule IDs or names that are business hours schedules
-        dummy_user_name: Name for the dummy user placeholder (default: "Dummy User")
+        business_hours_schedules: Optional list of schedule IDs that are business hours schedules
+        dummy_user_id: PagerDuty user ID for creating schedule overrides (required if business_hours_schedules is set)
 
     Returns:
         AnalysisResult containing categorized user reports
@@ -236,10 +236,10 @@ def analyze_schedules(
     schedule_ids = [schedule.id for schedule in schedules]
     logger.info(f"Analyzing {len(schedules)} schedules: {', '.join(s.name for s in schedules)}")
 
-    # Identify which schedules are business hours schedules (by ID or name)
+    # Identify which schedules are business hours schedules (by ID only)
     business_hours_schedule_ids = set()
     for schedule in schedules:
-        if schedule.id in business_hours_schedules or schedule.name in business_hours_schedules:
+        if schedule.id in business_hours_schedules:
             business_hours_schedule_ids.add(schedule.id)
             logger.info(f"BUSINESS HOURS SCHEDULE: {schedule.name} ({schedule.id})")
 
@@ -273,44 +273,64 @@ def analyze_schedules(
         if entry.schedule.name not in user_schedules[entry.user.id]:
             user_schedules[entry.user.id].append(entry.schedule.name)
 
-    # Step 5a: Check business hours schedules for coverage gaps (PTO/holiday)
+    # Step 5a: Check business hours schedules for coverage gaps (PTO/holiday) and create overrides
     coverage_gaps: List[dict] = []
+    overrides_created: List[dict] = []
     if business_hours_schedule_ids and (pto_by_email or holidays_by_timezone):
         # Process business hours schedule entries to find coverage gaps
         bh_entries = [e for e in entries if e.schedule.id in business_hours_schedule_ids]
-        bh_user_days = calculate_oncall_days(bh_entries, month, year, workday_end_hour)
 
-        for user_id, bh_dates in bh_user_days.items():
-            if user_id not in users:
-                continue
-            user = users[user_id]
+        for entry in bh_entries:
+            user = entry.user
+            entry_date = entry.start.date()
 
-            # Find dates where user is unavailable
-            unavailable_dates = _get_unavailable_dates_for_user(
-                user, bh_dates, pto_by_email, holidays_by_timezone
-            )
-
-            if unavailable_dates:
-                # Get schedule names for this user's business hours schedules
-                bh_schedule_names = [
-                    e.schedule.name for e in bh_entries
-                    if e.user.id == user_id and e.schedule.id in business_hours_schedule_ids
-                ]
-                bh_schedule_names = list(set(bh_schedule_names))
-
+            # Check if user is unavailable on this entry's date
+            if _is_user_unavailable_on_date(user, entry_date, pto_by_email, holidays_by_timezone):
                 gap_info = {
                     "user": user.name,
                     "email": user.email,
-                    "schedule": ", ".join(bh_schedule_names),
-                    "dates": sorted(unavailable_dates),
+                    "schedule_id": entry.schedule.id,
+                    "schedule_name": entry.schedule.name,
+                    "date": entry_date,
+                    "start": entry.start,
+                    "end": entry.end,
                 }
                 coverage_gaps.append(gap_info)
 
                 logger.warning(
                     f"COVERAGE GAP: {user.name} ({user.email}) is scheduled on business hours "
-                    f"schedule '{', '.join(bh_schedule_names)}' but has PTO/holiday on: "
-                    f"{[d.isoformat() for d in sorted(unavailable_dates)]}"
+                    f"schedule '{entry.schedule.name}' ({entry.schedule.id}) but has PTO/holiday on: "
+                    f"{entry_date.isoformat()}"
                 )
+
+                # Create schedule override if dummy_user_id is provided
+                if dummy_user_id:
+                    try:
+                        override = client.create_schedule_override(
+                            schedule_id=entry.schedule.id,
+                            user_id=dummy_user_id,
+                            start=entry.start,
+                            end=entry.end,
+                        )
+                        overrides_created.append({
+                            "schedule_id": entry.schedule.id,
+                            "schedule_name": entry.schedule.name,
+                            "original_user": user.name,
+                            "date": entry_date.isoformat(),
+                            "override_id": override.get("id"),
+                        })
+                        logger.info(
+                            f"OVERRIDE CREATED: Replaced {user.name} with dummy user on "
+                            f"schedule '{entry.schedule.name}' for {entry_date.isoformat()}"
+                        )
+                    except Exception as e:
+                        logger.error(
+                            f"Failed to create override for {user.name} on schedule "
+                            f"'{entry.schedule.name}' ({entry.schedule.id}): {e}"
+                        )
+
+        if overrides_created:
+            logger.info(f"Created {len(overrides_created)} schedule overrides for coverage gaps")
 
     # Step 5b: Check for PTO conflicts
     pto_conflicts = []
@@ -399,7 +419,7 @@ def analyze_multiple_months(
     pto_by_email: Optional[Dict[str, List[PTOEntry]]] = None,
     holidays_by_timezone: Optional[Dict[str, List[HolidayEntry]]] = None,
     business_hours_schedules: Optional[List[str]] = None,
-    dummy_user_name: str = "Dummy User",
+    dummy_user_id: Optional[str] = None,
 ) -> MultiMonthAnalysisResult:
     """Analyze on-call schedules for multiple consecutive months.
 
@@ -420,8 +440,8 @@ def analyze_multiple_months(
         excluded_schedules: Optional list of schedule IDs or names to exclude from analysis
         pto_by_email: Optional dict mapping user emails to lists of PTO entries
         holidays_by_timezone: Optional dict mapping timezones to lists of holidays
-        business_hours_schedules: Optional list of schedule IDs or names that are business hours schedules
-        dummy_user_name: Name for the dummy user placeholder (default: "Dummy User")
+        business_hours_schedules: Optional list of schedule IDs that are business hours schedules
+        dummy_user_id: PagerDuty user ID for creating schedule overrides (required if business_hours_schedules is set)
 
     Returns:
         MultiMonthAnalysisResult containing results for each month
@@ -460,7 +480,7 @@ def analyze_multiple_months(
             pto_by_email=pto_by_email,
             holidays_by_timezone=holidays_by_timezone,
             business_hours_schedules=business_hours_schedules,
-            dummy_user_name=dummy_user_name,
+            dummy_user_id=dummy_user_id,
         )
         results.append(result)
 

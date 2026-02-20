@@ -87,14 +87,14 @@ class Settings(BaseSettings):
 
     business_hours_schedules: Optional[str] = Field(
         default=None,
-        description="Comma-separated list of schedule IDs or names that are business hours schedules. For these schedules, users on PTO/holidays will be replaced with a dummy user.",
+        description="Comma-separated list of schedule IDs that are business hours schedules. For these schedules, users on PTO/holidays will be replaced with a dummy user via schedule overrides.",
         validation_alias="BUSINESS_HOURS_SCHEDULES",
     )
 
-    dummy_user_name: str = Field(
-        default="Dummy User",
-        description="Name to use for the dummy user placeholder in business hours schedules when users are on PTO/holiday.",
-        validation_alias="DUMMY_USER_NAME",
+    dummy_user_id: Optional[str] = Field(
+        default=None,
+        description="PagerDuty user ID for the dummy user to use when creating schedule overrides for business hours schedules.",
+        validation_alias="DUMMY_USER_ID",
     )
 
     def get_team_ids(self) -> List[str]:
@@ -159,10 +159,10 @@ class Settings(BaseSettings):
         return [schedule.strip() for schedule in self.excluded_schedules.split(",")]
 
     def get_business_hours_schedules(self) -> List[str]:
-        """Parse and return business hours schedules as a list.
+        """Parse and return business hours schedule IDs as a list.
 
         Returns:
-            List of schedule IDs or names that are business hours schedules.
+            List of schedule IDs that are business hours schedules.
         """
         if not self.business_hours_schedules:
             return []

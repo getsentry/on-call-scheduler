@@ -161,12 +161,12 @@ def cli():
     "-b",
     "business_hours_schedules",
     multiple=True,
-    help="Schedule IDs or names that are business hours schedules (can be specified multiple times). For these schedules, users on PTO/holidays will be replaced with a dummy user.",
+    help="Schedule IDs that are business hours schedules (can be specified multiple times). For these schedules, users on PTO/holidays will be replaced with a dummy user via schedule overrides.",
 )
 @click.option(
-    "--dummy-user-name",
-    "dummy_user_name",
-    help="Name for the dummy user placeholder (default: 'Dummy User')",
+    "--dummy-user-id",
+    "dummy_user_id",
+    help="PagerDuty user ID for the dummy user to assign when creating schedule overrides for business hours schedules.",
 )
 def check(
     teams: tuple,
@@ -182,7 +182,7 @@ def check(
     pto_file: Optional[str],
     holidays_file: Optional[str],
     business_hours_schedules: tuple,
-    dummy_user_name: Optional[str],
+    dummy_user_id: Optional[str],
 ):
     """Check on-call schedules and identify users over the limit."""
     # Setup logging
@@ -235,8 +235,8 @@ def check(
         list(business_hours_schedules) if business_hours_schedules else settings.get_business_hours_schedules()
     )
 
-    # Determine dummy user name (CLI arg takes precedence over config)
-    dummy_user_name_value: str = dummy_user_name if dummy_user_name else settings.dummy_user_name
+    # Determine dummy user ID (CLI arg takes precedence over config)
+    dummy_user_id_value: Optional[str] = dummy_user_id if dummy_user_id else settings.dummy_user_id
 
     # Load holidays data if provided
     holidays_by_timezone: dict[str, List[HolidayEntry]] = {}
@@ -296,7 +296,10 @@ def check(
             click.echo(f"Holidays: {total_holidays} holidays across {len(holidays_by_timezone)} timezones loaded", err=True)
         if business_hours_schedules_list:
             click.echo(f"Business hours schedules: {', '.join(business_hours_schedules_list)}", err=True)
-            click.echo(f"Dummy user name: {dummy_user_name_value}", err=True)
+            if dummy_user_id_value:
+                click.echo(f"Dummy user ID: {dummy_user_id_value}", err=True)
+            else:
+                click.echo("Warning: No dummy user ID configured, overrides will not be created", err=True)
         click.echo("", err=True)
 
     try:
@@ -331,7 +334,7 @@ def check(
                 pto_by_email=pto_by_email,
                 holidays_by_timezone=holidays_by_timezone,
                 business_hours_schedules=business_hours_schedules_list,
-                dummy_user_name=dummy_user_name_value,
+                dummy_user_id=dummy_user_id_value,
             )
 
             # Display results
@@ -357,7 +360,7 @@ def check(
                 pto_by_email=pto_by_email,
                 holidays_by_timezone=holidays_by_timezone,
                 business_hours_schedules=business_hours_schedules_list,
-                dummy_user_name=dummy_user_name_value,
+                dummy_user_id=dummy_user_id_value,
             )
 
             # Display results

@@ -225,3 +225,55 @@ class PagerDutyClient:
                 self._handle_api_error(Exception(f"HTTP {response.status_code}"))
         except Exception as e:
             self._handle_api_error(e)
+
+    def create_schedule_override(
+        self,
+        schedule_id: str,
+        user_id: str,
+        start: datetime,
+        end: datetime,
+    ) -> dict:
+        """Create a schedule override to assign a different user for a time period.
+
+        Args:
+            schedule_id: PagerDuty schedule ID
+            user_id: PagerDuty user ID to assign for the override
+            start: Start datetime for the override
+            end: End datetime for the override
+
+        Returns:
+            The created override data from PagerDuty API
+
+        Raises:
+            AuthenticationError: If authentication fails
+            ResourceNotFoundError: If schedule or user is not found
+            PagerDutyAPIError: For other API errors
+        """
+        client = self._get_client()
+
+        def _create_override():
+            payload = {
+                "override": {
+                    "start": start.isoformat(),
+                    "end": end.isoformat(),
+                    "user": {
+                        "id": user_id,
+                        "type": "user_reference",
+                    },
+                }
+            }
+
+            try:
+                response = client.post(f"/schedules/{schedule_id}/overrides", json=payload)
+                if response.is_success:
+                    logger.info(
+                        f"Created override on schedule {schedule_id}: "
+                        f"user {user_id} from {start} to {end}"
+                    )
+                    return response.json().get("override", {})
+                else:
+                    self._handle_api_error(Exception(f"HTTP {response.status_code}: {response.text}"))
+            except Exception as e:
+                self._handle_api_error(e)
+
+        return self._retry_with_backoff(_create_override)

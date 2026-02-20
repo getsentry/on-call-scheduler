@@ -568,7 +568,7 @@ class TestAnalyzeSchedules:
                 max_days=10,
                 client=mock_client,
                 pto_by_email=pto_by_email,
-                business_hours_schedules=["Business Hours Schedule"],
+                business_hours_schedules=["PSCHED1"],  # By ID
             )
 
         # Should log coverage gap warning
