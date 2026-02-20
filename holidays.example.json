@@ -1,0 +1,34 @@
+{
+  "America/New_York": [
+    {"date": "2026-01-01", "name": "New Year's Day"},
+    {"date": "2026-01-20", "name": "Martin Luther King Jr. Day"},
+    {"date": "2026-02-17", "name": "Presidents' Day"},
+    {"date": "2026-05-25", "name": "Memorial Day"},
+    {"date": "2026-07-04", "name": "Independence Day"},
+    {"date": "2026-09-07", "name": "Labor Day"},
+    {"date": "2026-11-26", "name": "Thanksgiving Day"},
+    {"date": "2026-11-27", "name": "Day after Thanksgiving"},
+    {"date": "2026-12-25", "name": "Christmas Day"}
+  ],
+  "America/Los_Angeles": [
+    {"date": "2026-01-01", "name": "New Year's Day"},
+    {"date": "2026-01-20", "name": "Martin Luther King Jr. Day"},
+    {"date": "2026-02-17", "name": "Presidents' Day"},
+    {"date": "2026-05-25", "name": "Memorial Day"},
+    {"date": "2026-07-04", "name": "Independence Day"},
+    {"date": "2026-09-07", "name": "Labor Day"},
+    {"date": "2026-11-26", "name": "Thanksgiving Day"},
+    {"date": "2026-11-27", "name": "Day after Thanksgiving"},
+    {"date": "2026-12-25", "name": "Christmas Day"}
+  ],
+  "Europe/London": [
+    {"date": "2026-01-01", "name": "New Year's Day"},
+    {"date": "2026-04-03", "name": "Good Friday"},
+    {"date": "2026-04-06", "name": "Easter Monday"},
+    {"date": "2026-05-04", "name": "Early May Bank Holiday"},
+    {"date": "2026-05-25", "name": "Spring Bank Holiday"},
+    {"date": "2026-08-31", "name": "Summer Bank Holiday"},
+    {"date": "2026-12-25", "name": "Christmas Day"},
+    {"date": "2026-12-26", "name": "Boxing Day"}
+  ]
+}
