@@ -191,18 +191,9 @@ def analyze_schedules(
         if entry.schedule.name not in user_schedules[entry.user.id]:
             user_schedules[entry.user.id].append(entry.schedule.name)
 
-    # Step 5b: Check for PTO conflicts
-    pto_conflicts = []
-    if pto_by_email:
-        pto_conflicts = _find_pto_conflicts(user_days, users, user_schedules, pto_by_email)
-
-    # Step 6: Categorize users by their on-call days
-    over_limit = []
-    at_limit = []
-    under_limit = []
-
+    # Step 5b: Filter user_days based on timezone and excluded_users
+    filtered_user_days: Dict[str, set] = {}
     for user_id, dates in user_days.items():
-        day_count = len(dates)
         user = users[user_id]
 
         # Filter by timezone if timezones_of_concern is specified
@@ -214,6 +205,22 @@ def analyze_schedules(
         if excluded_users and user.email in excluded_users:
             logger.debug(f"EXCLUDED: {user.name} ({user.email}) - user is in excluded list")
             continue
+
+        filtered_user_days[user_id] = dates
+
+    # Step 5c: Check for PTO conflicts (using filtered data)
+    pto_conflicts = []
+    if pto_by_email:
+        pto_conflicts = _find_pto_conflicts(filtered_user_days, users, user_schedules, pto_by_email)
+
+    # Step 6: Categorize users by their on-call days
+    over_limit = []
+    at_limit = []
+    under_limit = []
+
+    for user_id, dates in filtered_user_days.items():
+        day_count = len(dates)
+        user = users[user_id]
 
         schedule_names = ", ".join(user_schedules[user_id])
 
