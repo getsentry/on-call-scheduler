@@ -78,6 +78,46 @@ def _format_pto_conflicts_table(conflicts: List[PTOConflict], console: Console, 
     console.print(table)
 
 
+def _format_multi_month_pto_conflicts_table(results: List[AnalysisResult], console: Console) -> int:
+    """Format and display PTO conflicts from multiple months as a Rich table.
+
+    Args:
+        results: List of AnalysisResult objects for each month
+        console: Rich Console instance
+
+    Returns:
+        Total number of PTO conflicts across all months
+    """
+    total_pto_conflicts = sum(len(r.pto_conflicts) for r in results)
+    if total_pto_conflicts == 0:
+        return 0
+
+    console.print()
+    console.print("[bold magenta]PTO Conflicts - On-Call Days Needing Adjustment[/bold magenta]")
+    console.print()
+
+    pto_table = Table(show_header=True, header_style="bold")
+    pto_table.add_column("Month")
+    pto_table.add_column("User")
+    pto_table.add_column("Conflicts", justify="center")
+    pto_table.add_column("Schedule")
+    pto_table.add_column("Conflicting Dates")
+
+    for month_result in results:
+        month_label = f"{calendar.month_abbr[month_result.month]} {month_result.year}"
+        for conflict in month_result.pto_conflicts:
+            pto_table.add_row(
+                f"[magenta]{month_label}[/magenta]",
+                f"[magenta]{conflict.user.name}[/magenta]",
+                f"[magenta bold]{len(conflict.conflicting_dates)}[/magenta bold]",
+                f"[magenta]{conflict.schedule_name}[/magenta]",
+                f"[magenta]{_format_date_ranges(conflict.conflicting_dates)}[/magenta]",
+            )
+
+    console.print(pto_table)
+    return total_pto_conflicts
+
+
 def _add_rows_to_table(
     table: Table,
     reports: List[OnCallReport],
@@ -280,31 +320,7 @@ def format_multi_month_table(result: MultiMonthAnalysisResult) -> None:
         )
 
     # Display PTO conflicts if any
-    total_pto_conflicts = sum(len(r.pto_conflicts) for r in result.results)
-    if total_pto_conflicts > 0:
-        console.print()
-        console.print("[bold magenta]PTO Conflicts - On-Call Days Needing Adjustment[/bold magenta]")
-        console.print()
-
-        pto_table = Table(show_header=True, header_style="bold")
-        pto_table.add_column("Month")
-        pto_table.add_column("User")
-        pto_table.add_column("Conflicts", justify="center")
-        pto_table.add_column("Schedule")
-        pto_table.add_column("Conflicting Dates")
-
-        for month_result in result.results:
-            month_label = f"{calendar.month_abbr[month_result.month]} {month_result.year}"
-            for conflict in month_result.pto_conflicts:
-                pto_table.add_row(
-                    f"[magenta]{month_label}[/magenta]",
-                    f"[magenta]{conflict.user.name}[/magenta]",
-                    f"[magenta bold]{len(conflict.conflicting_dates)}[/magenta bold]",
-                    f"[magenta]{conflict.schedule_name}[/magenta]",
-                    f"[magenta]{_format_date_ranges(conflict.conflicting_dates)}[/magenta]",
-                )
-
-        console.print(pto_table)
+    total_pto_conflicts = _format_multi_month_pto_conflicts_table(result.results, console)
 
     # Summary
     total_over = sum(len(r.over_limit) for r in result.results)
@@ -375,31 +391,7 @@ def format_multi_month_table_verbose(result: MultiMonthAnalysisResult) -> None:
         console.print()
 
     # Display PTO conflicts if any
-    total_pto_conflicts = sum(len(r.pto_conflicts) for r in result.results)
-    if total_pto_conflicts > 0:
-        console.print()
-        console.print("[bold magenta]PTO Conflicts - On-Call Days Needing Adjustment[/bold magenta]")
-        console.print()
-
-        pto_table = Table(show_header=True, header_style="bold")
-        pto_table.add_column("Month")
-        pto_table.add_column("User")
-        pto_table.add_column("Conflicts", justify="center")
-        pto_table.add_column("Schedule")
-        pto_table.add_column("Conflicting Dates")
-
-        for month_result in result.results:
-            month_label = f"{calendar.month_abbr[month_result.month]} {month_result.year}"
-            for conflict in month_result.pto_conflicts:
-                pto_table.add_row(
-                    f"[magenta]{month_label}[/magenta]",
-                    f"[magenta]{conflict.user.name}[/magenta]",
-                    f"[magenta bold]{len(conflict.conflicting_dates)}[/magenta bold]",
-                    f"[magenta]{conflict.schedule_name}[/magenta]",
-                    f"[magenta]{_format_date_ranges(conflict.conflicting_dates)}[/magenta]",
-                )
-
-        console.print(pto_table)
+    total_pto_conflicts = _format_multi_month_pto_conflicts_table(result.results, console)
 
     # Summary
     total_over = sum(len(r.over_limit) for r in result.results)
