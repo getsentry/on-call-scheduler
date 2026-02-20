@@ -221,7 +221,7 @@ def check(
         except FileNotFoundError as e:
             click.echo(f"Error: {e}", err=True)
             sys.exit(1)
-        except (json.JSONDecodeError, KeyError, ValueError) as e:
+        except (json.JSONDecodeError, KeyError, ValueError, AttributeError, TypeError) as e:
             click.echo(f"Error parsing PTO file: {e}", err=True)
             sys.exit(1)
 
