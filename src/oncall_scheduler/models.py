@@ -121,11 +121,23 @@ class PTOEntry:
         Args:
             user_email: Email of the user
             data: Dictionary with 'start' and 'end' date strings (YYYY-MM-DD)
+
+        Raises:
+            ValueError: If start date is after end date
         """
+        start = date.fromisoformat(data["start"])
+        end = date.fromisoformat(data["end"])
+
+        if start > end:
+            raise ValueError(
+                f"Invalid PTO entry for {user_email}: start date ({data['start']}) "
+                f"is after end date ({data['end']})"
+            )
+
         return cls(
             user_email=user_email,
-            start=date.fromisoformat(data["start"]),
-            end=date.fromisoformat(data["end"]),
+            start=start,
+            end=end,
         )
 
     def contains_date(self, d: date) -> bool:

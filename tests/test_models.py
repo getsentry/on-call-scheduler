@@ -341,6 +341,29 @@ class TestPTOEntry:
         assert not entry.contains_date(date(2026, 2, 21))  # After
         assert not entry.contains_date(date(2026, 1, 17))  # Different month
 
+    def test_from_dict_swapped_dates_raises_error(self):
+        """Test that from_dict raises ValueError when start is after end."""
+        data = {"start": "2026-02-20", "end": "2026-02-15"}
+
+        with pytest.raises(ValueError) as exc_info:
+            PTOEntry.from_dict("user@example.com", data)
+
+        assert "user@example.com" in str(exc_info.value)
+        assert "2026-02-20" in str(exc_info.value)
+        assert "2026-02-15" in str(exc_info.value)
+        assert "start date" in str(exc_info.value).lower()
+        assert "after end date" in str(exc_info.value).lower()
+
+    def test_from_dict_same_day_is_valid(self):
+        """Test that from_dict accepts start and end on the same day."""
+        data = {"start": "2026-02-15", "end": "2026-02-15"}
+
+        entry = PTOEntry.from_dict("user@example.com", data)
+
+        assert entry.start == date(2026, 2, 15)
+        assert entry.end == date(2026, 2, 15)
+        assert entry.contains_date(date(2026, 2, 15))
+
 
 class TestPTOConflict:
     """Tests for the PTOConflict model."""
