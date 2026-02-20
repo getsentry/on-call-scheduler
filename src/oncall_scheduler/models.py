@@ -107,6 +107,57 @@ class OnCallReport:
 
 
 @dataclass
+class PTOEntry:
+    """Represents a PTO (paid time off) period for a user."""
+
+    user_email: str
+    start: date
+    end: date
+
+    @classmethod
+    def from_dict(cls, user_email: str, data: dict) -> "PTOEntry":
+        """Create a PTOEntry from dictionary data.
+
+        Args:
+            user_email: Email of the user
+            data: Dictionary with 'start' and 'end' date strings (YYYY-MM-DD)
+        """
+        return cls(
+            user_email=user_email,
+            start=date.fromisoformat(data["start"]),
+            end=date.fromisoformat(data["end"]),
+        )
+
+    def contains_date(self, d: date) -> bool:
+        """Check if the given date falls within this PTO period."""
+        return self.start <= d <= self.end
+
+
+@dataclass
+class PTOConflict:
+    """Represents a conflict between on-call schedule and PTO."""
+
+    user: User
+    schedule_name: str
+    conflicting_dates: List[date] = field(default_factory=list)
+
+    def to_dict(self) -> dict:
+        """Convert to dictionary for JSON serialization."""
+        return {
+            "user": {
+                "id": self.user.id,
+                "name": self.user.name,
+                "email": self.user.email,
+                "html_url": self.user.html_url,
+                "timezone": self.user.timezone,
+            },
+            "schedule_name": self.schedule_name,
+            "conflicting_dates": [d.isoformat() for d in self.conflicting_dates],
+            "conflict_count": len(self.conflicting_dates),
+        }
+
+
+@dataclass
 class AnalysisResult:
     """Complete analysis result for a month."""
 
@@ -116,10 +167,11 @@ class AnalysisResult:
     over_limit: List[OnCallReport] = field(default_factory=list)
     at_limit: List[OnCallReport] = field(default_factory=list)
     under_limit: List[OnCallReport] = field(default_factory=list)
+    pto_conflicts: List[PTOConflict] = field(default_factory=list)
 
     def to_dict(self) -> dict:
         """Convert to dictionary for JSON serialization."""
-        return {
+        result = {
             "month": self.month,
             "year": self.year,
             "max_days": self.max_days,
@@ -132,6 +184,10 @@ class AnalysisResult:
                 "under_limit_count": len(self.under_limit),
             },
         }
+        if self.pto_conflicts:
+            result["pto_conflicts"] = [conflict.to_dict() for conflict in self.pto_conflicts]
+            result["summary"]["pto_conflict_count"] = len(self.pto_conflicts)
+        return result
 
 
 @dataclass
@@ -143,7 +199,7 @@ class MultiMonthAnalysisResult:
 
     def to_dict(self) -> dict:
         """Convert to dictionary for JSON serialization."""
-        return {
+        result = {
             "max_days": self.max_days,
             "months": [result.to_dict() for result in self.results],
             "summary": {
@@ -153,3 +209,7 @@ class MultiMonthAnalysisResult:
                 "total_under_limit": sum(len(r.under_limit) for r in self.results),
             },
         }
+        total_pto_conflicts = sum(len(r.pto_conflicts) for r in self.results)
+        if total_pto_conflicts > 0:
+            result["summary"]["total_pto_conflicts"] = total_pto_conflicts
+        return result

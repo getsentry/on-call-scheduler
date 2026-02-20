@@ -1,6 +1,7 @@
 """Configuration management for the on-call scheduler application."""
 
 import json
+from pathlib import Path
 from typing import Dict, List, Optional
 
 from pydantic import Field
@@ -149,3 +150,35 @@ class Settings(BaseSettings):
 def load_settings() -> Settings:
     """Load and return application settings."""
     return Settings()
+
+
+def load_pto_data(pto_file: str) -> Dict[str, List[Dict[str, str]]]:
+    """Load PTO data from a JSON file.
+
+    Expected format:
+    {
+        "user@example.com": [
+            {"start": "2026-02-15", "end": "2026-02-20"},
+            {"start": "2026-03-01", "end": "2026-03-05"}
+        ],
+        "another@example.com": [
+            {"start": "2026-02-10", "end": "2026-02-12"}
+        ]
+    }
+
+    Args:
+        pto_file: Path to the PTO JSON file
+
+    Returns:
+        Dictionary mapping user emails to lists of PTO date ranges
+
+    Raises:
+        FileNotFoundError: If the PTO file does not exist
+        json.JSONDecodeError: If the file is not valid JSON
+    """
+    path = Path(pto_file)
+    if not path.exists():
+        raise FileNotFoundError(f"PTO file not found: {pto_file}")
+
+    with open(path, "r", encoding="utf-8") as f:
+        return json.load(f)

@@ -7,7 +7,7 @@ import pytest
 import pytz
 
 from oncall_scheduler.analysis.analyzer import analyze_schedules
-from oncall_scheduler.models import Schedule, ScheduleEntry, User
+from oncall_scheduler.models import PTOEntry, Schedule, ScheduleEntry, User
 
 
 class TestAnalyzeSchedules:
@@ -417,3 +417,119 @@ class TestAnalyzeSchedules:
         assert len(result.at_limit) == 0
         assert len(result.under_limit) == 0
         mock_client.get_oncalls.assert_not_called()
+
+    def test_analyze_schedules_with_pto_conflicts(self):
+        """Test analysis detects PTO conflicts."""
+        from datetime import date
+
+        user = User(id="PUSER1", name="Test User", email="test@example.com")
+        schedule = Schedule(id="PSCHED1", name="Test Schedule", timezone="UTC")
+
+        # Create entries for days 1-10
+        entries = []
+        for day in range(1, 11):
+            start = pytz.utc.localize(datetime(2026, 1, day, 0, 0, 0))
+            end = pytz.utc.localize(datetime(2026, 1, day, 23, 59, 59))
+            entries.append(ScheduleEntry(user=user, schedule=schedule, start=start, end=end))
+
+        # PTO for days 5-7 (should conflict with on-call)
+        pto_by_email = {
+            "test@example.com": [
+                PTOEntry(user_email="test@example.com", start=date(2026, 1, 5), end=date(2026, 1, 7))
+            ]
+        }
+
+        mock_client = Mock()
+        mock_client.get_schedules_by_team.return_value = [schedule]
+        mock_client.get_oncalls.return_value = entries
+
+        result = analyze_schedules(
+            team_ids=["TEAM1"],
+            month=1,
+            year=2026,
+            max_days=10,
+            client=mock_client,
+            pto_by_email=pto_by_email,
+        )
+
+        # Should have 1 PTO conflict with 3 days (5, 6, 7)
+        assert len(result.pto_conflicts) == 1
+        assert result.pto_conflicts[0].user.id == "PUSER1"
+        assert len(result.pto_conflicts[0].conflicting_dates) == 3
+        assert date(2026, 1, 5) in result.pto_conflicts[0].conflicting_dates
+        assert date(2026, 1, 6) in result.pto_conflicts[0].conflicting_dates
+        assert date(2026, 1, 7) in result.pto_conflicts[0].conflicting_dates
+
+    def test_analyze_schedules_no_pto_conflict_when_no_overlap(self):
+        """Test analysis returns no conflicts when PTO doesn't overlap with on-call."""
+        from datetime import date
+
+        user = User(id="PUSER1", name="Test User", email="test@example.com")
+        schedule = Schedule(id="PSCHED1", name="Test Schedule", timezone="UTC")
+
+        # Create entries for days 1-5
+        entries = []
+        for day in range(1, 6):
+            start = pytz.utc.localize(datetime(2026, 1, day, 0, 0, 0))
+            end = pytz.utc.localize(datetime(2026, 1, day, 23, 59, 59))
+            entries.append(ScheduleEntry(user=user, schedule=schedule, start=start, end=end))
+
+        # PTO for days 10-15 (no overlap with on-call days 1-5)
+        pto_by_email = {
+            "test@example.com": [
+                PTOEntry(user_email="test@example.com", start=date(2026, 1, 10), end=date(2026, 1, 15))
+            ]
+        }
+
+        mock_client = Mock()
+        mock_client.get_schedules_by_team.return_value = [schedule]
+        mock_client.get_oncalls.return_value = entries
+
+        result = analyze_schedules(
+            team_ids=["TEAM1"],
+            month=1,
+            year=2026,
+            max_days=10,
+            client=mock_client,
+            pto_by_email=pto_by_email,
+        )
+
+        # Should have no PTO conflicts
+        assert len(result.pto_conflicts) == 0
+
+    def test_analyze_schedules_pto_for_different_user(self):
+        """Test analysis ignores PTO for users not in the schedule."""
+        from datetime import date
+
+        user = User(id="PUSER1", name="Test User", email="test@example.com")
+        schedule = Schedule(id="PSCHED1", name="Test Schedule", timezone="UTC")
+
+        # Create entries for days 1-5
+        entries = []
+        for day in range(1, 6):
+            start = pytz.utc.localize(datetime(2026, 1, day, 0, 0, 0))
+            end = pytz.utc.localize(datetime(2026, 1, day, 23, 59, 59))
+            entries.append(ScheduleEntry(user=user, schedule=schedule, start=start, end=end))
+
+        # PTO for a different user
+        pto_by_email = {
+            "other@example.com": [
+                PTOEntry(user_email="other@example.com", start=date(2026, 1, 1), end=date(2026, 1, 5))
+            ]
+        }
+
+        mock_client = Mock()
+        mock_client.get_schedules_by_team.return_value = [schedule]
+        mock_client.get_oncalls.return_value = entries
+
+        result = analyze_schedules(
+            team_ids=["TEAM1"],
+            month=1,
+            year=2026,
+            max_days=10,
+            client=mock_client,
+            pto_by_email=pto_by_email,
+        )
+
+        # Should have no PTO conflicts since the PTO is for a different user
+        assert len(result.pto_conflicts) == 0

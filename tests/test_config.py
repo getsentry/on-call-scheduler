@@ -6,7 +6,7 @@ from unittest.mock import patch
 import pytest
 from pydantic import ValidationError
 
-from oncall_scheduler.config import Settings, load_settings
+from oncall_scheduler.config import Settings, load_pto_data, load_settings
 
 
 class TestSettings:
@@ -223,3 +223,59 @@ class TestLoadSettings:
         excluded_schedules = settings.get_excluded_schedules()
 
         assert excluded_schedules == ["SCHEDULE1", "SCHEDULE2", "Primary On-Call"]
+
+
+class TestLoadPtoData:
+    """Tests for the load_pto_data function."""
+
+    def test_load_pto_data_valid(self, tmp_path):
+        """Test loading valid PTO data from a JSON file."""
+        import json
+
+        pto_data = {
+            "user1@example.com": [
+                {"start": "2026-02-15", "end": "2026-02-20"},
+                {"start": "2026-03-01", "end": "2026-03-05"},
+            ],
+            "user2@example.com": [
+                {"start": "2026-02-10", "end": "2026-02-12"},
+            ],
+        }
+
+        pto_file = tmp_path / "pto.json"
+        pto_file.write_text(json.dumps(pto_data))
+
+        result = load_pto_data(str(pto_file))
+
+        assert result == pto_data
+        assert len(result) == 2
+        assert len(result["user1@example.com"]) == 2
+        assert len(result["user2@example.com"]) == 1
+
+    def test_load_pto_data_file_not_found(self):
+        """Test that load_pto_data raises FileNotFoundError for missing file."""
+        with pytest.raises(FileNotFoundError) as exc_info:
+            load_pto_data("/nonexistent/path/pto.json")
+
+        assert "PTO file not found" in str(exc_info.value)
+
+    def test_load_pto_data_invalid_json(self, tmp_path):
+        """Test that load_pto_data raises JSONDecodeError for invalid JSON."""
+        import json
+
+        pto_file = tmp_path / "invalid.json"
+        pto_file.write_text("not valid json {")
+
+        with pytest.raises(json.JSONDecodeError):
+            load_pto_data(str(pto_file))
+
+    def test_load_pto_data_empty_file(self, tmp_path):
+        """Test loading an empty PTO data file."""
+        import json
+
+        pto_file = tmp_path / "empty.json"
+        pto_file.write_text("{}")
+
+        result = load_pto_data(str(pto_file))
+
+        assert result == {}
