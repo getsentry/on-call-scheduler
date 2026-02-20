@@ -225,9 +225,11 @@ class TestAnalysisResult:
         assert output["over_limit"] == []
         assert output["at_limit"] == []
         assert output["under_limit"] == []
+        assert output["pto_conflicts"] == []
         assert output["summary"]["over_limit_count"] == 0
         assert output["summary"]["at_limit_count"] == 0
         assert output["summary"]["under_limit_count"] == 0
+        assert output["summary"]["pto_conflict_count"] == 0
 
     def test_to_dict_with_reports(self):
         """Test converting AnalysisResult with reports to dictionary."""

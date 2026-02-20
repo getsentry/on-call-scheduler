@@ -171,23 +171,21 @@ class AnalysisResult:
 
     def to_dict(self) -> dict:
         """Convert to dictionary for JSON serialization."""
-        result = {
+        return {
             "month": self.month,
             "year": self.year,
             "max_days": self.max_days,
             "over_limit": [report.to_dict() for report in self.over_limit],
             "at_limit": [report.to_dict() for report in self.at_limit],
             "under_limit": [report.to_dict() for report in self.under_limit],
+            "pto_conflicts": [conflict.to_dict() for conflict in self.pto_conflicts],
             "summary": {
                 "over_limit_count": len(self.over_limit),
                 "at_limit_count": len(self.at_limit),
                 "under_limit_count": len(self.under_limit),
+                "pto_conflict_count": len(self.pto_conflicts),
             },
         }
-        if self.pto_conflicts:
-            result["pto_conflicts"] = [conflict.to_dict() for conflict in self.pto_conflicts]
-            result["summary"]["pto_conflict_count"] = len(self.pto_conflicts)
-        return result
 
 
 @dataclass
@@ -199,7 +197,7 @@ class MultiMonthAnalysisResult:
 
     def to_dict(self) -> dict:
         """Convert to dictionary for JSON serialization."""
-        result = {
+        return {
             "max_days": self.max_days,
             "months": [result.to_dict() for result in self.results],
             "summary": {
@@ -207,9 +205,6 @@ class MultiMonthAnalysisResult:
                 "total_over_limit": sum(len(r.over_limit) for r in self.results),
                 "total_at_limit": sum(len(r.at_limit) for r in self.results),
                 "total_under_limit": sum(len(r.under_limit) for r in self.results),
+                "total_pto_conflicts": sum(len(r.pto_conflicts) for r in self.results),
             },
         }
-        total_pto_conflicts = sum(len(r.pto_conflicts) for r in self.results)
-        if total_pto_conflicts > 0:
-            result["summary"]["total_pto_conflicts"] = total_pto_conflicts
-        return result
