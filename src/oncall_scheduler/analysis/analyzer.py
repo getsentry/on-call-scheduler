@@ -3,8 +3,8 @@
 import calendar
 import logging
 from collections import defaultdict
-from datetime import datetime
-from typing import Dict, List, Optional
+from datetime import date, datetime
+from typing import Dict, List, Optional, Set
 
 import pytz
 
@@ -12,6 +12,7 @@ from oncall_scheduler.analysis.calculator import calculate_oncall_days, get_user
 from oncall_scheduler.api.client import PagerDutyClient
 from oncall_scheduler.models import (
     AnalysisResult,
+    HolidayEntry,
     MultiMonthAnalysisResult,
     OnCallReport,
     PTOConflict,
@@ -21,6 +22,62 @@ from oncall_scheduler.models import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+def _is_user_unavailable_on_date(
+    user: User,
+    d: date,
+    pto_by_email: Dict[str, List[PTOEntry]],
+    holidays_by_timezone: Dict[str, List[HolidayEntry]],
+) -> bool:
+    """Check if a user is unavailable on a specific date due to PTO or holiday.
+
+    Args:
+        user: The user to check
+        d: The date to check
+        pto_by_email: Dictionary mapping user emails to lists of PTO entries
+        holidays_by_timezone: Dictionary mapping timezones to lists of holidays
+
+    Returns:
+        True if the user is unavailable (on PTO or holiday), False otherwise
+    """
+    # Check PTO
+    user_pto = pto_by_email.get(user.email, [])
+    for pto_entry in user_pto:
+        if pto_entry.contains_date(d):
+            return True
+
+    # Check holidays for user's timezone
+    user_holidays = holidays_by_timezone.get(user.timezone, [])
+    for holiday in user_holidays:
+        if holiday.date == d:
+            return True
+
+    return False
+
+
+def _get_unavailable_dates_for_user(
+    user: User,
+    dates: Set[date],
+    pto_by_email: Dict[str, List[PTOEntry]],
+    holidays_by_timezone: Dict[str, List[HolidayEntry]],
+) -> Set[date]:
+    """Get the dates when a user is unavailable due to PTO or holiday.
+
+    Args:
+        user: The user to check
+        dates: Set of dates to check
+        pto_by_email: Dictionary mapping user emails to lists of PTO entries
+        holidays_by_timezone: Dictionary mapping timezones to lists of holidays
+
+    Returns:
+        Set of dates when the user is unavailable
+    """
+    unavailable = set()
+    for d in dates:
+        if _is_user_unavailable_on_date(user, d, pto_by_email, holidays_by_timezone):
+            unavailable.add(d)
+    return unavailable
 
 
 def _find_pto_conflicts(
@@ -87,11 +144,17 @@ def analyze_schedules(
     excluded_users: Optional[List[str]] = None,
     excluded_schedules: Optional[List[str]] = None,
     pto_by_email: Optional[Dict[str, List[PTOEntry]]] = None,
+    holidays_by_timezone: Optional[Dict[str, List[HolidayEntry]]] = None,
+    business_hours_schedules: Optional[List[str]] = None,
+    dummy_user_name: str = "Dummy User",
 ) -> AnalysisResult:
     """Analyze on-call schedules for teams and identify users over the limit.
 
     Only counts days where users have on-call coverage extending past the
     workday end hour in their local timezone.
+
+    For business hours schedules, users who are on PTO or holiday will have
+    their days reassigned to a dummy user placeholder.
 
     Args:
         team_ids: List of PagerDuty team IDs to analyze
@@ -105,6 +168,9 @@ def analyze_schedules(
         excluded_users: Optional list of user emails to exclude from over-limit reporting
         excluded_schedules: Optional list of schedule IDs or names to exclude from analysis
         pto_by_email: Optional dict mapping user emails to lists of PTO entries
+        holidays_by_timezone: Optional dict mapping timezones to lists of holidays
+        business_hours_schedules: Optional list of schedule IDs or names that are business hours schedules
+        dummy_user_name: Name for the dummy user placeholder (default: "Dummy User")
 
     Returns:
         AnalysisResult containing categorized user reports
@@ -123,6 +189,10 @@ def analyze_schedules(
         excluded_schedules = []
     if pto_by_email is None:
         pto_by_email = {}
+    if holidays_by_timezone is None:
+        holidays_by_timezone = {}
+    if business_hours_schedules is None:
+        business_hours_schedules = []
 
     logger.info(f"Starting analysis for {len(team_ids)} teams in {month}/{year}")
     logger.info(f"Maximum days limit: {max_days}")
@@ -138,6 +208,11 @@ def analyze_schedules(
     if pto_by_email:
         total_pto_periods = sum(len(periods) for periods in pto_by_email.values())
         logger.info(f"Checking PTO for {len(pto_by_email)} users ({total_pto_periods} periods)")
+    if holidays_by_timezone:
+        total_holidays = sum(len(h) for h in holidays_by_timezone.values())
+        logger.info(f"Checking {total_holidays} holidays across {len(holidays_by_timezone)} timezones")
+    if business_hours_schedules:
+        logger.info(f"Business hours schedules: {', '.join(business_hours_schedules)}")
 
     # Step 1: Fetch schedules for the specified teams
     all_schedules = client.get_schedules_by_team(team_ids)
@@ -160,6 +235,13 @@ def analyze_schedules(
 
     schedule_ids = [schedule.id for schedule in schedules]
     logger.info(f"Analyzing {len(schedules)} schedules: {', '.join(s.name for s in schedules)}")
+
+    # Identify which schedules are business hours schedules (by ID or name)
+    business_hours_schedule_ids = set()
+    for schedule in schedules:
+        if schedule.id in business_hours_schedules or schedule.name in business_hours_schedules:
+            business_hours_schedule_ids.add(schedule.id)
+            logger.info(f"BUSINESS HOURS SCHEDULE: {schedule.name} ({schedule.id})")
 
     # Step 2: Calculate date range for the month
     month_start = datetime(year, month, 1)
@@ -190,6 +272,45 @@ def analyze_schedules(
 
         if entry.schedule.name not in user_schedules[entry.user.id]:
             user_schedules[entry.user.id].append(entry.schedule.name)
+
+    # Step 5a: Check business hours schedules for coverage gaps (PTO/holiday)
+    coverage_gaps: List[dict] = []
+    if business_hours_schedule_ids and (pto_by_email or holidays_by_timezone):
+        # Process business hours schedule entries to find coverage gaps
+        bh_entries = [e for e in entries if e.schedule.id in business_hours_schedule_ids]
+        bh_user_days = calculate_oncall_days(bh_entries, month, year, workday_end_hour)
+
+        for user_id, bh_dates in bh_user_days.items():
+            if user_id not in users:
+                continue
+            user = users[user_id]
+
+            # Find dates where user is unavailable
+            unavailable_dates = _get_unavailable_dates_for_user(
+                user, bh_dates, pto_by_email, holidays_by_timezone
+            )
+
+            if unavailable_dates:
+                # Get schedule names for this user's business hours schedules
+                bh_schedule_names = [
+                    e.schedule.name for e in bh_entries
+                    if e.user.id == user_id and e.schedule.id in business_hours_schedule_ids
+                ]
+                bh_schedule_names = list(set(bh_schedule_names))
+
+                gap_info = {
+                    "user": user.name,
+                    "email": user.email,
+                    "schedule": ", ".join(bh_schedule_names),
+                    "dates": sorted(unavailable_dates),
+                }
+                coverage_gaps.append(gap_info)
+
+                logger.warning(
+                    f"COVERAGE GAP: {user.name} ({user.email}) is scheduled on business hours "
+                    f"schedule '{', '.join(bh_schedule_names)}' but has PTO/holiday on: "
+                    f"{[d.isoformat() for d in sorted(unavailable_dates)]}"
+                )
 
     # Step 5b: Check for PTO conflicts
     pto_conflicts = []
@@ -276,6 +397,9 @@ def analyze_multiple_months(
     excluded_users: Optional[List[str]] = None,
     excluded_schedules: Optional[List[str]] = None,
     pto_by_email: Optional[Dict[str, List[PTOEntry]]] = None,
+    holidays_by_timezone: Optional[Dict[str, List[HolidayEntry]]] = None,
+    business_hours_schedules: Optional[List[str]] = None,
+    dummy_user_name: str = "Dummy User",
 ) -> MultiMonthAnalysisResult:
     """Analyze on-call schedules for multiple consecutive months.
 
@@ -295,6 +419,9 @@ def analyze_multiple_months(
         excluded_users: Optional list of user emails to exclude from over-limit reporting
         excluded_schedules: Optional list of schedule IDs or names to exclude from analysis
         pto_by_email: Optional dict mapping user emails to lists of PTO entries
+        holidays_by_timezone: Optional dict mapping timezones to lists of holidays
+        business_hours_schedules: Optional list of schedule IDs or names that are business hours schedules
+        dummy_user_name: Name for the dummy user placeholder (default: "Dummy User")
 
     Returns:
         MultiMonthAnalysisResult containing results for each month
@@ -307,6 +434,10 @@ def analyze_multiple_months(
         excluded_schedules = []
     if pto_by_email is None:
         pto_by_email = {}
+    if holidays_by_timezone is None:
+        holidays_by_timezone = {}
+    if business_hours_schedules is None:
+        business_hours_schedules = []
 
     logger.info(f"Analyzing {num_months} months starting from {start_month}/{start_year}")
 
@@ -327,6 +458,9 @@ def analyze_multiple_months(
             excluded_users=excluded_users,
             excluded_schedules=excluded_schedules,
             pto_by_email=pto_by_email,
+            holidays_by_timezone=holidays_by_timezone,
+            business_hours_schedules=business_hours_schedules,
+            dummy_user_name=dummy_user_name,
         )
         results.append(result)
 

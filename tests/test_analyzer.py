@@ -7,7 +7,7 @@ import pytest
 import pytz
 
 from oncall_scheduler.analysis.analyzer import analyze_schedules
-from oncall_scheduler.models import PTOEntry, Schedule, ScheduleEntry, User
+from oncall_scheduler.models import HolidayEntry, PTOEntry, Schedule, ScheduleEntry, User
 
 
 class TestAnalyzeSchedules:
@@ -533,3 +533,127 @@ class TestAnalyzeSchedules:
 
         # Should have no PTO conflicts since the PTO is for a different user
         assert len(result.pto_conflicts) == 0
+
+    def test_analyze_schedules_business_hours_coverage_gap_with_pto(self, caplog):
+        """Test that business hours schedules log coverage gaps for users on PTO."""
+        from datetime import date
+        import logging
+
+        user = User(id="PUSER1", name="Test User", email="test@example.com", timezone="America/New_York")
+        schedule = Schedule(id="PSCHED1", name="Business Hours Schedule", timezone="America/New_York")
+
+        # Create entries for days 1-10
+        entries = []
+        for day in range(1, 11):
+            start = pytz.utc.localize(datetime(2026, 1, day, 0, 0, 0))
+            end = pytz.utc.localize(datetime(2026, 1, day, 23, 59, 59))
+            entries.append(ScheduleEntry(user=user, schedule=schedule, start=start, end=end))
+
+        # PTO for days 5-7 (should create coverage gap)
+        pto_by_email = {
+            "test@example.com": [
+                PTOEntry(user_email="test@example.com", start=date(2026, 1, 5), end=date(2026, 1, 7))
+            ]
+        }
+
+        mock_client = Mock()
+        mock_client.get_schedules_by_team.return_value = [schedule]
+        mock_client.get_oncalls.return_value = entries
+
+        with caplog.at_level(logging.WARNING):
+            result = analyze_schedules(
+                team_ids=["TEAM1"],
+                month=1,
+                year=2026,
+                max_days=10,
+                client=mock_client,
+                pto_by_email=pto_by_email,
+                business_hours_schedules=["Business Hours Schedule"],
+            )
+
+        # Should log coverage gap warning
+        assert "COVERAGE GAP" in caplog.text
+        assert "Test User" in caplog.text
+
+    def test_analyze_schedules_business_hours_coverage_gap_with_holiday(self, caplog):
+        """Test that business hours schedules log coverage gaps for users on holiday."""
+        from datetime import date
+        import logging
+
+        user = User(id="PUSER1", name="Test User", email="test@example.com", timezone="America/New_York")
+        schedule = Schedule(id="PSCHED1", name="Business Hours Schedule", timezone="America/New_York")
+
+        # Create entries for days 1-10 (includes Jan 1 which is a holiday)
+        entries = []
+        for day in range(1, 11):
+            start = pytz.utc.localize(datetime(2026, 1, day, 0, 0, 0))
+            end = pytz.utc.localize(datetime(2026, 1, day, 23, 59, 59))
+            entries.append(ScheduleEntry(user=user, schedule=schedule, start=start, end=end))
+
+        # Holiday on Jan 1 for America/New_York timezone
+        holidays_by_timezone = {
+            "America/New_York": [
+                HolidayEntry(date=date(2026, 1, 1), name="New Year's Day", timezone="America/New_York")
+            ]
+        }
+
+        mock_client = Mock()
+        mock_client.get_schedules_by_team.return_value = [schedule]
+        mock_client.get_oncalls.return_value = entries
+
+        with caplog.at_level(logging.WARNING):
+            result = analyze_schedules(
+                team_ids=["TEAM1"],
+                month=1,
+                year=2026,
+                max_days=10,
+                client=mock_client,
+                holidays_by_timezone=holidays_by_timezone,
+                business_hours_schedules=["PSCHED1"],  # By ID
+            )
+
+        # Should log coverage gap warning for holiday
+        assert "COVERAGE GAP" in caplog.text
+        assert "Test User" in caplog.text
+
+    def test_analyze_schedules_no_coverage_gap_for_non_business_hours_schedule(self, caplog):
+        """Test that non-business hours schedules don't log coverage gaps."""
+        from datetime import date
+        import logging
+
+        user = User(id="PUSER1", name="Test User", email="test@example.com", timezone="America/New_York")
+        schedule = Schedule(id="PSCHED1", name="24/7 Schedule", timezone="America/New_York")
+
+        # Create entries for days 1-10
+        entries = []
+        for day in range(1, 11):
+            start = pytz.utc.localize(datetime(2026, 1, day, 0, 0, 0))
+            end = pytz.utc.localize(datetime(2026, 1, day, 23, 59, 59))
+            entries.append(ScheduleEntry(user=user, schedule=schedule, start=start, end=end))
+
+        # PTO for days 5-7
+        pto_by_email = {
+            "test@example.com": [
+                PTOEntry(user_email="test@example.com", start=date(2026, 1, 5), end=date(2026, 1, 7))
+            ]
+        }
+
+        mock_client = Mock()
+        mock_client.get_schedules_by_team.return_value = [schedule]
+        mock_client.get_oncalls.return_value = entries
+
+        with caplog.at_level(logging.WARNING):
+            result = analyze_schedules(
+                team_ids=["TEAM1"],
+                month=1,
+                year=2026,
+                max_days=10,
+                client=mock_client,
+                pto_by_email=pto_by_email,
+                business_hours_schedules=[],  # No business hours schedules
+            )
+
+        # Should NOT log coverage gap (schedule is not business hours)
+        assert "COVERAGE GAP" not in caplog.text
+        # But should still detect PTO conflicts
+        assert len(result.pto_conflicts) == 1

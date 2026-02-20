@@ -17,8 +17,8 @@ from oncall_scheduler.api.exceptions import (
     PagerDutyAPIError,
     ResourceNotFoundError,
 )
-from oncall_scheduler.config import load_pto_data, load_settings
-from oncall_scheduler.models import PTOEntry
+from oncall_scheduler.config import load_holidays_data, load_pto_data, load_settings
+from oncall_scheduler.models import HolidayEntry, PTOEntry
 from oncall_scheduler.output.formatter import (
     format_json,
     format_multi_month_table,
@@ -150,6 +150,24 @@ def cli():
     type=click.Path(exists=True),
     help="Path to JSON file containing PTO data to check for on-call conflicts",
 )
+@click.option(
+    "--holidays-file",
+    "holidays_file",
+    type=click.Path(exists=True),
+    help="Path to JSON file containing holidays by timezone",
+)
+@click.option(
+    "--business-hours-schedule",
+    "-b",
+    "business_hours_schedules",
+    multiple=True,
+    help="Schedule IDs or names that are business hours schedules (can be specified multiple times). For these schedules, users on PTO/holidays will be replaced with a dummy user.",
+)
+@click.option(
+    "--dummy-user-name",
+    "dummy_user_name",
+    help="Name for the dummy user placeholder (default: 'Dummy User')",
+)
 def check(
     teams: tuple,
     max_days: Optional[int],
@@ -162,6 +180,9 @@ def check(
     excluded_users: tuple,
     excluded_schedules: tuple,
     pto_file: Optional[str],
+    holidays_file: Optional[str],
+    business_hours_schedules: tuple,
+    dummy_user_name: Optional[str],
 ):
     """Check on-call schedules and identify users over the limit."""
     # Setup logging
@@ -209,6 +230,30 @@ def check(
     # Determine excluded schedules (CLI args take precedence over config)
     excluded_schedules_list: List[str] = list(excluded_schedules) if excluded_schedules else settings.get_excluded_schedules()
 
+    # Determine business hours schedules (CLI args take precedence over config)
+    business_hours_schedules_list: List[str] = (
+        list(business_hours_schedules) if business_hours_schedules else settings.get_business_hours_schedules()
+    )
+
+    # Determine dummy user name (CLI arg takes precedence over config)
+    dummy_user_name_value: str = dummy_user_name if dummy_user_name else settings.dummy_user_name
+
+    # Load holidays data if provided
+    holidays_by_timezone: dict[str, List[HolidayEntry]] = {}
+    if holidays_file:
+        try:
+            holidays_data = load_holidays_data(holidays_file)
+            for timezone, holidays in holidays_data.items():
+                holidays_by_timezone[timezone] = [
+                    HolidayEntry.from_dict(timezone, holiday) for holiday in holidays
+                ]
+        except FileNotFoundError as e:
+            click.echo(f"Error: {e}", err=True)
+            sys.exit(1)
+        except (json.JSONDecodeError, KeyError, ValueError) as e:
+            click.echo(f"Error parsing holidays file: {e}", err=True)
+            sys.exit(1)
+
     # Load PTO data if provided
     pto_by_email: dict[str, List[PTOEntry]] = {}
     if pto_file:
@@ -246,6 +291,12 @@ def check(
         if pto_by_email:
             total_periods = sum(len(periods) for periods in pto_by_email.values())
             click.echo(f"PTO: {len(pto_by_email)} users, {total_periods} periods loaded", err=True)
+        if holidays_by_timezone:
+            total_holidays = sum(len(h) for h in holidays_by_timezone.values())
+            click.echo(f"Holidays: {total_holidays} holidays across {len(holidays_by_timezone)} timezones loaded", err=True)
+        if business_hours_schedules_list:
+            click.echo(f"Business hours schedules: {', '.join(business_hours_schedules_list)}", err=True)
+            click.echo(f"Dummy user name: {dummy_user_name_value}", err=True)
         click.echo("", err=True)
 
     try:
@@ -278,6 +329,9 @@ def check(
                 excluded_users=excluded_users_list,
                 excluded_schedules=excluded_schedules_list,
                 pto_by_email=pto_by_email,
+                holidays_by_timezone=holidays_by_timezone,
+                business_hours_schedules=business_hours_schedules_list,
+                dummy_user_name=dummy_user_name_value,
             )
 
             # Display results
@@ -301,6 +355,9 @@ def check(
                 excluded_users=excluded_users_list,
                 excluded_schedules=excluded_schedules_list,
                 pto_by_email=pto_by_email,
+                holidays_by_timezone=holidays_by_timezone,
+                business_hours_schedules=business_hours_schedules_list,
+                dummy_user_name=dummy_user_name_value,
             )
 
             # Display results

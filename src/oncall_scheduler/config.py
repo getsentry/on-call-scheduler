@@ -85,6 +85,18 @@ class Settings(BaseSettings):
         validation_alias="EXCLUDED_SCHEDULES",
     )
 
+    business_hours_schedules: Optional[str] = Field(
+        default=None,
+        description="Comma-separated list of schedule IDs or names that are business hours schedules. For these schedules, users on PTO/holidays will be replaced with a dummy user.",
+        validation_alias="BUSINESS_HOURS_SCHEDULES",
+    )
+
+    dummy_user_name: str = Field(
+        default="Dummy User",
+        description="Name to use for the dummy user placeholder in business hours schedules when users are on PTO/holiday.",
+        validation_alias="DUMMY_USER_NAME",
+    )
+
     def get_team_ids(self) -> List[str]:
         """Parse and return team IDs as a list."""
         if not self.pagerduty_team_ids:
@@ -146,6 +158,16 @@ class Settings(BaseSettings):
             return []
         return [schedule.strip() for schedule in self.excluded_schedules.split(",")]
 
+    def get_business_hours_schedules(self) -> List[str]:
+        """Parse and return business hours schedules as a list.
+
+        Returns:
+            List of schedule IDs or names that are business hours schedules.
+        """
+        if not self.business_hours_schedules:
+            return []
+        return [schedule.strip() for schedule in self.business_hours_schedules.split(",")]
+
 
 def load_settings() -> Settings:
     """Load and return application settings."""
@@ -179,6 +201,39 @@ def load_pto_data(pto_file: str) -> Dict[str, List[Dict[str, str]]]:
     path = Path(pto_file)
     if not path.exists():
         raise FileNotFoundError(f"PTO file not found: {pto_file}")
+
+    with open(path, "r", encoding="utf-8") as f:
+        return json.load(f)
+
+
+def load_holidays_data(holidays_file: str) -> Dict[str, List[Dict[str, str]]]:
+    """Load holidays data from a JSON file.
+
+    Expected format (organized by timezone):
+    {
+        "America/New_York": [
+            {"date": "2026-12-25", "name": "Christmas"},
+            {"date": "2026-07-04", "name": "Independence Day"}
+        ],
+        "Europe/London": [
+            {"date": "2026-12-25", "name": "Christmas"},
+            {"date": "2026-12-26", "name": "Boxing Day"}
+        ]
+    }
+
+    Args:
+        holidays_file: Path to the holidays JSON file
+
+    Returns:
+        Dictionary mapping timezones to lists of holiday entries
+
+    Raises:
+        FileNotFoundError: If the holidays file does not exist
+        json.JSONDecodeError: If the file is not valid JSON
+    """
+    path = Path(holidays_file)
+    if not path.exists():
+        raise FileNotFoundError(f"Holidays file not found: {holidays_file}")
 
     with open(path, "r", encoding="utf-8") as f:
         return json.load(f)

@@ -134,6 +134,52 @@ class PTOEntry:
 
 
 @dataclass
+class HolidayEntry:
+    """Represents a holiday for a specific timezone."""
+
+    date: date
+    name: str
+    timezone: str
+
+    @classmethod
+    def from_dict(cls, timezone: str, data: dict) -> "HolidayEntry":
+        """Create a HolidayEntry from dictionary data.
+
+        Args:
+            timezone: Timezone this holiday applies to
+            data: Dictionary with 'date' (YYYY-MM-DD) and 'name' fields
+        """
+        return cls(
+            timezone=timezone,
+            date=date.fromisoformat(data["date"]),
+            name=data.get("name", "Holiday"),
+        )
+
+
+@dataclass
+class HolidayEntry:
+    """Represents a holiday for a specific timezone."""
+
+    date: date
+    name: str
+    timezone: str
+
+    @classmethod
+    def from_dict(cls, timezone: str, data: dict) -> "HolidayEntry":
+        """Create a HolidayEntry from dictionary data.
+
+        Args:
+            timezone: Timezone this holiday applies to
+            data: Dictionary with 'date' (YYYY-MM-DD) and 'name' fields
+        """
+        return cls(
+            timezone=timezone,
+            date=date.fromisoformat(data["date"]),
+            name=data.get("name", "Holiday"),
+        )
+
+
+@dataclass
 class PTOConflict:
     """Represents a conflict between on-call schedule and PTO."""
 
