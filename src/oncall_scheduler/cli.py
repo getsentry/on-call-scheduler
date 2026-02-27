@@ -158,6 +158,20 @@ def cli():
     envvar="HOLIDAY_FILE",
     help="Path to JSON file containing holiday data to check for on-call conflicts (keyed by timezone)",
 )
+@click.option(
+    "--include-schedules-from-holidays",
+    "included_schedules_for_holidays",
+    multiple=True,
+    envvar="INCLUDE_SCHEDULES_FROM_HOLIDAYS",
+    help="Only check specified schedules for holiday conflicts by ID or name (can be specified multiple times)",
+)
+@click.option(
+    "--exclude-schedules-from-holidays",
+    "excluded_schedules_for_holidays",
+    multiple=True,
+    envvar="EXCLUDE_SCHEDULES_FROM_HOLIDAYS",
+    help="Exclude specified schedules from holiday conflict checking by ID or name (can be specified multiple times)",
+)
 def check(
     teams: tuple,
     max_days: int | None,
@@ -171,6 +185,8 @@ def check(
     excluded_schedules: tuple,
     pto_file: str | None,
     holiday_file: str | None,
+    included_schedules_for_holidays: tuple,
+    excluded_schedules_for_holidays: tuple,
 ):
     """Check on-call schedules and identify users over the limit."""
     # Setup logging
@@ -217,6 +233,12 @@ def check(
 
     # Determine excluded schedules (CLI args take precedence over config)
     excluded_schedules_list: list[str] = list(excluded_schedules) if excluded_schedules else settings.get_excluded_schedules()
+
+    # Determine included schedules for holidays (CLI args take precedence over config)
+    included_schedules_for_holidays_list: list[str] = list(included_schedules_for_holidays) if included_schedules_for_holidays else settings.get_included_schedules_for_holidays()
+
+    # Determine excluded schedules for holidays (CLI args take precedence over config)
+    excluded_schedules_for_holidays_list: list[str] = list(excluded_schedules_for_holidays) if excluded_schedules_for_holidays else settings.get_excluded_schedules_for_holidays()
 
     # Determine PTO file (CLI arg takes precedence over config)
     pto_file_path = pto_file if pto_file else settings.pto_file
@@ -280,6 +302,10 @@ def check(
         if holidays_by_timezone:
             total_holidays = sum(len(holidays) for holidays in holidays_by_timezone.values())
             click.echo(f"Holidays: {len(holidays_by_timezone)} timezones, {total_holidays} holidays loaded", err=True)
+        if included_schedules_for_holidays_list:
+            click.echo(f"Holiday conflict included schedules: {', '.join(included_schedules_for_holidays_list)}", err=True)
+        if excluded_schedules_for_holidays_list:
+            click.echo(f"Holiday conflict excluded schedules: {', '.join(excluded_schedules_for_holidays_list)}", err=True)
         click.echo("", err=True)
 
     try:
@@ -313,6 +339,8 @@ def check(
                 excluded_schedules=excluded_schedules_list,
                 pto_by_email=pto_by_email,
                 holidays_by_timezone=holidays_by_timezone,
+                included_schedules_for_holidays=included_schedules_for_holidays_list,
+                excluded_schedules_for_holidays=excluded_schedules_for_holidays_list,
             )
 
             # Display results
@@ -337,6 +365,8 @@ def check(
                 excluded_schedules=excluded_schedules_list,
                 pto_by_email=pto_by_email,
                 holidays_by_timezone=holidays_by_timezone,
+                included_schedules_for_holidays=included_schedules_for_holidays_list,
+                excluded_schedules_for_holidays=excluded_schedules_for_holidays_list,
             )
 
             # Display results
