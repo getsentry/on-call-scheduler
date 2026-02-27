@@ -184,13 +184,6 @@ def analyze_schedules(
     user_schedules: Dict[str, List[str]] = defaultdict(list)
     user_schedule_days: Dict[str, Dict[str, set]] = defaultdict(lambda: defaultdict(set))
 
-    # Calculate month boundaries for per-schedule date extraction
-    month_start = datetime(year, month, 1)
-    last_day = calendar.monthrange(year, month)[1]
-    month_end = datetime(year, month, last_day, 23, 59, 59)
-    month_start = pytz.utc.localize(month_start)
-    month_end = pytz.utc.localize(month_end)
-
     for entry in entries:
         if entry.user.id not in users:
             users[entry.user.id] = entry.user
