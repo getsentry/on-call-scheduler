@@ -8,7 +8,7 @@ from typing import Dict, List, Optional
 
 import pytz
 
-from oncall_scheduler.analysis.calculator import calculate_oncall_days, get_dates_in_range, get_user_schedule_days
+from oncall_scheduler.analysis.calculator import get_dates_in_range
 from oncall_scheduler.api.client import PagerDutyClient
 from oncall_scheduler.models import (
     AnalysisResult,
@@ -16,7 +16,6 @@ from oncall_scheduler.models import (
     OnCallReport,
     PTOConflict,
     PTOEntry,
-    ScheduleEntry,
     User,
 )
 
@@ -176,10 +175,7 @@ def analyze_schedules(
         logger.warning(f"No on-call entries found for the specified period")
         return AnalysisResult(month=month, year=year, max_days=max_days)
 
-    # Step 4: Calculate days per user (only after-hours coverage)
-    user_days = calculate_oncall_days(entries, month, year, workday_end_hour)
-
-    # Step 5: Build mappings of user_id to User object and schedule-specific days
+    # Step 4: Build mappings of user_id to User object and schedule-specific days
     users: Dict[str, User] = {}
     user_schedules: Dict[str, List[str]] = defaultdict(list)
     user_schedule_days: Dict[str, Dict[str, set]] = defaultdict(lambda: defaultdict(set))
@@ -191,11 +187,17 @@ def analyze_schedules(
         if entry.schedule.name not in user_schedules[entry.user.id]:
             user_schedules[entry.user.id].append(entry.schedule.name)
 
-        # Track dates per schedule for PTO conflict detection
+        # Track dates per schedule (used for PTO conflict detection and aggregated for user totals)
         entry_dates = get_dates_in_range(
             entry.start, entry.end, month_start, month_end, entry.user.timezone, workday_end_hour
         )
         user_schedule_days[entry.user.id][entry.schedule.name].update(entry_dates)
+
+    # Step 5: Derive per-user day totals by merging per-schedule sets
+    user_days: Dict[str, set] = {
+        user_id: set().union(*schedule_days.values())
+        for user_id, schedule_days in user_schedule_days.items()
+    }
 
     # Step 5b: Filter user_days based on timezone and excluded_users
     filtered_user_days: Dict[str, set] = {}
