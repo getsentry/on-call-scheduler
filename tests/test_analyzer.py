@@ -623,3 +623,66 @@ class TestAnalyzeSchedules:
         # Only user2 should appear in PTO conflicts (user1 filtered by timezone)
         assert len(result.pto_conflicts) == 1
         assert result.pto_conflicts[0].user.id == "PUSER2"
+
+    def test_analyze_schedules_pto_conflicts_per_schedule(self):
+        """Test that PTO conflicts are reported separately per schedule."""
+        from datetime import date
+
+        user = User(id="PUSER1", name="Test User", email="test@example.com")
+        schedule1 = Schedule(id="PSCHED1", name="Primary Schedule", timezone="UTC")
+        schedule2 = Schedule(id="PSCHED2", name="Secondary Schedule", timezone="UTC")
+
+        entries = []
+        # User is on schedule1 for days 1-5
+        for day in range(1, 6):
+            start = pytz.utc.localize(datetime(2026, 1, day, 0, 0, 0))
+            end = pytz.utc.localize(datetime(2026, 1, day, 23, 59, 59))
+            entries.append(ScheduleEntry(user=user, schedule=schedule1, start=start, end=end))
+
+        # User is on schedule2 for days 8-12
+        for day in range(8, 13):
+            start = pytz.utc.localize(datetime(2026, 1, day, 0, 0, 0))
+            end = pytz.utc.localize(datetime(2026, 1, day, 23, 59, 59))
+            entries.append(ScheduleEntry(user=user, schedule=schedule2, start=start, end=end))
+
+        # PTO covers days 3-10 (overlaps both schedules)
+        pto_by_email = {
+            "test@example.com": [
+                PTOEntry(user_email="test@example.com", start=date(2026, 1, 3), end=date(2026, 1, 10))
+            ]
+        }
+
+        mock_client = Mock()
+        mock_client.get_schedules_by_team.return_value = [schedule1, schedule2]
+        mock_client.get_oncalls.return_value = entries
+
+        result = analyze_schedules(
+            team_ids=["TEAM1"],
+            month=1,
+            year=2026,
+            max_days=10,
+            client=mock_client,
+            pto_by_email=pto_by_email,
+        )
+
+        # Should have 2 PTO conflicts - one per schedule
+        assert len(result.pto_conflicts) == 2
+
+        # Find conflicts by schedule name
+        conflicts_by_schedule = {c.schedule_name: c for c in result.pto_conflicts}
+        assert "Primary Schedule" in conflicts_by_schedule
+        assert "Secondary Schedule" in conflicts_by_schedule
+
+        # Primary schedule conflicts: days 3, 4, 5 (overlap with PTO days 3-10)
+        primary_conflict = conflicts_by_schedule["Primary Schedule"]
+        assert len(primary_conflict.conflicting_dates) == 3
+        assert date(2026, 1, 3) in primary_conflict.conflicting_dates
+        assert date(2026, 1, 4) in primary_conflict.conflicting_dates
+        assert date(2026, 1, 5) in primary_conflict.conflicting_dates
+
+        # Secondary schedule conflicts: days 8, 9, 10 (overlap with PTO days 3-10)
+        secondary_conflict = conflicts_by_schedule["Secondary Schedule"]
+        assert len(secondary_conflict.conflicting_dates) == 3
+        assert date(2026, 1, 8) in secondary_conflict.conflicting_dates
+        assert date(2026, 1, 9) in secondary_conflict.conflicting_dates
+        assert date(2026, 1, 10) in secondary_conflict.conflicting_dates

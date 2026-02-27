@@ -8,7 +8,7 @@ from typing import Dict, List, Optional
 
 import pytz
 
-from oncall_scheduler.analysis.calculator import calculate_oncall_days, get_user_schedule_days
+from oncall_scheduler.analysis.calculator import calculate_oncall_days, get_dates_in_range, get_user_schedule_days
 from oncall_scheduler.api.client import PagerDutyClient
 from oncall_scheduler.models import (
     AnalysisResult,
@@ -24,51 +24,50 @@ logger = logging.getLogger(__name__)
 
 
 def _find_pto_conflicts(
-    user_days: Dict[str, set],
+    user_schedule_days: Dict[str, Dict[str, set]],
     users: Dict[str, User],
-    user_schedules: Dict[str, List[str]],
     pto_by_email: Dict[str, List[PTOEntry]],
 ) -> List[PTOConflict]:
     """Find conflicts between on-call schedules and PTO.
 
     Args:
-        user_days: Dictionary mapping user IDs to sets of on-call dates
+        user_schedule_days: Dictionary mapping user IDs to schedule names to sets of on-call dates
         users: Dictionary mapping user IDs to User objects
-        user_schedules: Dictionary mapping user IDs to schedule names
         pto_by_email: Dictionary mapping user emails to lists of PTO entries
 
     Returns:
-        List of PTOConflict objects for users with conflicts
+        List of PTOConflict objects for users with conflicts (one per schedule)
     """
     conflicts = []
 
-    for user_id, dates in user_days.items():
+    for user_id, schedule_dates in user_schedule_days.items():
         user = users[user_id]
         user_pto = pto_by_email.get(user.email, [])
 
         if not user_pto:
             continue
 
-        # Find dates that conflict with PTO
-        conflicting_dates = []
-        for d in dates:
-            for pto_entry in user_pto:
-                if pto_entry.contains_date(d):
-                    conflicting_dates.append(d)
-                    break  # Don't add same date multiple times
+        # Check each schedule separately
+        for schedule_name, dates in schedule_dates.items():
+            # Find dates that conflict with PTO for this schedule
+            conflicting_dates = []
+            for d in dates:
+                for pto_entry in user_pto:
+                    if pto_entry.contains_date(d):
+                        conflicting_dates.append(d)
+                        break  # Don't add same date multiple times
 
-        if conflicting_dates:
-            schedule_names = ", ".join(user_schedules[user_id])
-            conflict = PTOConflict(
-                user=user,
-                schedule_name=schedule_names,
-                conflicting_dates=sorted(conflicting_dates),
-            )
-            conflicts.append(conflict)
-            logger.info(
-                f"PTO CONFLICT: {user.name} has {len(conflicting_dates)} on-call days "
-                f"during PTO: {[d.isoformat() for d in conflicting_dates]}"
-            )
+            if conflicting_dates:
+                conflict = PTOConflict(
+                    user=user,
+                    schedule_name=schedule_name,
+                    conflicting_dates=sorted(conflicting_dates),
+                )
+                conflicts.append(conflict)
+                logger.info(
+                    f"PTO CONFLICT: {user.name} on {schedule_name} has {len(conflicting_dates)} "
+                    f"on-call days during PTO: {[d.isoformat() for d in conflicting_dates]}"
+                )
 
     # Sort by number of conflicts (descending)
     conflicts.sort(key=lambda c: len(c.conflicting_dates), reverse=True)
@@ -180,9 +179,17 @@ def analyze_schedules(
     # Step 4: Calculate days per user (only after-hours coverage)
     user_days = calculate_oncall_days(entries, month, year, workday_end_hour)
 
-    # Step 5: Build a mapping of user_id to User object and schedule names
+    # Step 5: Build mappings of user_id to User object and schedule-specific days
     users: Dict[str, User] = {}
     user_schedules: Dict[str, List[str]] = defaultdict(list)
+    user_schedule_days: Dict[str, Dict[str, set]] = defaultdict(lambda: defaultdict(set))
+
+    # Calculate month boundaries for per-schedule date extraction
+    month_start = datetime(year, month, 1)
+    last_day = calendar.monthrange(year, month)[1]
+    month_end = datetime(year, month, last_day, 23, 59, 59)
+    month_start = pytz.utc.localize(month_start)
+    month_end = pytz.utc.localize(month_end)
 
     for entry in entries:
         if entry.user.id not in users:
@@ -191,8 +198,15 @@ def analyze_schedules(
         if entry.schedule.name not in user_schedules[entry.user.id]:
             user_schedules[entry.user.id].append(entry.schedule.name)
 
+        # Track dates per schedule for PTO conflict detection
+        entry_dates = get_dates_in_range(
+            entry.start, entry.end, month_start, month_end, entry.user.timezone, workday_end_hour
+        )
+        user_schedule_days[entry.user.id][entry.schedule.name].update(entry_dates)
+
     # Step 5b: Filter user_days based on timezone and excluded_users
     filtered_user_days: Dict[str, set] = {}
+    filtered_user_schedule_days: Dict[str, Dict[str, set]] = {}
     for user_id, dates in user_days.items():
         user = users[user_id]
 
@@ -207,11 +221,12 @@ def analyze_schedules(
             continue
 
         filtered_user_days[user_id] = dates
+        filtered_user_schedule_days[user_id] = dict(user_schedule_days[user_id])
 
     # Step 5c: Check for PTO conflicts (using filtered data)
     pto_conflicts = []
     if pto_by_email:
-        pto_conflicts = _find_pto_conflicts(filtered_user_days, users, user_schedules, pto_by_email)
+        pto_conflicts = _find_pto_conflicts(filtered_user_schedule_days, users, pto_by_email)
 
     # Step 6: Categorize users by their on-call days
     over_limit = []
