@@ -84,6 +84,18 @@ class Settings(BaseSettings):
         validation_alias="EXCLUDED_SCHEDULES",
     )
 
+    pto_file: str | None = Field(
+        default=None,
+        description="Path to JSON file containing PTO data to check for on-call conflicts.",
+        validation_alias="PTO_FILE",
+    )
+
+    holiday_file: str | None = Field(
+        default=None,
+        description="Path to JSON file containing holiday data to check for on-call conflicts (keyed by timezone).",
+        validation_alias="HOLIDAY_FILE",
+    )
+
     def get_team_ids(self) -> list[str]:
         """Parse and return team IDs as a list."""
         if not self.pagerduty_team_ids:

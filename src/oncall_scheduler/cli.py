@@ -218,11 +218,14 @@ def check(
     # Determine excluded schedules (CLI args take precedence over config)
     excluded_schedules_list: list[str] = list(excluded_schedules) if excluded_schedules else settings.get_excluded_schedules()
 
+    # Determine PTO file (CLI arg takes precedence over config)
+    pto_file_path = pto_file if pto_file else settings.pto_file
+
     # Load PTO data if provided
     pto_by_email: dict[str, list[PTOEntry]] = {}
-    if pto_file:
+    if pto_file_path:
         try:
-            pto_data = load_pto_data(pto_file)
+            pto_data = load_pto_data(pto_file_path)
             for user_email, periods in pto_data.items():
                 pto_by_email[user_email] = [
                     PTOEntry.from_dict(user_email, period) for period in periods
@@ -234,11 +237,14 @@ def check(
             click.echo(f"Error parsing PTO file: {e}", err=True)
             sys.exit(1)
 
+    # Determine holiday file (CLI arg takes precedence over config)
+    holiday_file_path = holiday_file if holiday_file else settings.holiday_file
+
     # Load holiday data if provided
     holidays_by_timezone: dict[str, list[HolidayEntry]] = {}
-    if holiday_file:
+    if holiday_file_path:
         try:
-            holiday_data = load_holiday_data(holiday_file)
+            holiday_data = load_holiday_data(holiday_file_path)
             for timezone, holidays in holiday_data.items():
                 holidays_by_timezone[timezone] = [
                     HolidayEntry.from_dict(timezone, holiday) for holiday in holidays
