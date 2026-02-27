@@ -14,15 +14,3 @@ source = "getsentry/dotagents"
 [[mcp]]
 name = "notion"
 url = "https://mcp.notion.com/mcp"
-
-[[skills]]
-name = "commit"
-source = "getsentry/skills"
-
-[[skills]]
-name = "create-pr"
-source = "getsentry/skills"
-
-[[skills]]
-name = "iterate-pr"
-source = "getsentry/skills"
