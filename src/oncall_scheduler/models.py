@@ -2,7 +2,6 @@
 
 from dataclasses import dataclass, field
 from datetime import date, datetime
-from typing import List, Optional
 
 
 @dataclass
@@ -12,7 +11,7 @@ class User:
     id: str
     name: str
     email: str
-    html_url: Optional[str] = None
+    html_url: str | None = None
     timezone: str = "UTC"
 
     @classmethod
@@ -39,7 +38,7 @@ class Schedule:
     id: str
     name: str
     timezone: str
-    html_url: Optional[str] = None
+    html_url: str | None = None
 
     @classmethod
     def from_api_response(cls, data: dict) -> "Schedule":
@@ -62,7 +61,7 @@ class ScheduleEntry:
     end: datetime
 
     @classmethod
-    def from_oncall_response(cls, data: dict, user_timezone_override: Optional[str] = None) -> "ScheduleEntry":
+    def from_oncall_response(cls, data: dict, user_timezone_override: str | None = None) -> "ScheduleEntry":
         """Create a ScheduleEntry from PagerDuty oncalls API response data.
 
         Args:
@@ -88,7 +87,7 @@ class OnCallReport:
     user: User
     schedule_name: str
     total_days: int
-    scheduled_dates: List[date] = field(default_factory=list)
+    scheduled_dates: list[date] = field(default_factory=list)
 
     def to_dict(self) -> dict:
         """Convert to dictionary for JSON serialization."""
@@ -151,7 +150,7 @@ class PTOConflict:
 
     user: User
     schedule_name: str
-    conflicting_dates: List[date] = field(default_factory=list)
+    conflicting_dates: list[date] = field(default_factory=list)
 
     def to_dict(self) -> dict:
         """Convert to dictionary for JSON serialization."""
@@ -170,16 +169,65 @@ class PTOConflict:
 
 
 @dataclass
+class HolidayEntry:
+    """Represents a holiday for a specific timezone."""
+
+    timezone: str
+    date: date
+    name: str
+
+    @classmethod
+    def from_dict(cls, timezone: str, data: dict) -> "HolidayEntry":
+        """Create a HolidayEntry from dictionary data.
+
+        Args:
+            timezone: Timezone the holiday applies to
+            data: Dictionary with 'date' (YYYY-MM-DD) and 'name' strings
+        """
+        return cls(
+            timezone=timezone,
+            date=date.fromisoformat(data["date"]),
+            name=data["name"],
+        )
+
+
+@dataclass
+class HolidayConflict:
+    """Represents a conflict between on-call schedule and a holiday."""
+
+    user: User
+    schedule_name: str
+    holiday_name: str
+    conflicting_date: date
+
+    def to_dict(self) -> dict:
+        """Convert to dictionary for JSON serialization."""
+        return {
+            "user": {
+                "id": self.user.id,
+                "name": self.user.name,
+                "email": self.user.email,
+                "html_url": self.user.html_url,
+                "timezone": self.user.timezone,
+            },
+            "schedule_name": self.schedule_name,
+            "holiday_name": self.holiday_name,
+            "conflicting_date": self.conflicting_date.isoformat(),
+        }
+
+
+@dataclass
 class AnalysisResult:
     """Complete analysis result for a month."""
 
     month: int
     year: int
     max_days: int
-    over_limit: List[OnCallReport] = field(default_factory=list)
-    at_limit: List[OnCallReport] = field(default_factory=list)
-    under_limit: List[OnCallReport] = field(default_factory=list)
-    pto_conflicts: List[PTOConflict] = field(default_factory=list)
+    over_limit: list[OnCallReport] = field(default_factory=list)
+    at_limit: list[OnCallReport] = field(default_factory=list)
+    under_limit: list[OnCallReport] = field(default_factory=list)
+    pto_conflicts: list[PTOConflict] = field(default_factory=list)
+    holiday_conflicts: list[HolidayConflict] = field(default_factory=list)
 
     def to_dict(self) -> dict:
         """Convert to dictionary for JSON serialization."""
@@ -191,11 +239,13 @@ class AnalysisResult:
             "at_limit": [report.to_dict() for report in self.at_limit],
             "under_limit": [report.to_dict() for report in self.under_limit],
             "pto_conflicts": [conflict.to_dict() for conflict in self.pto_conflicts],
+            "holiday_conflicts": [conflict.to_dict() for conflict in self.holiday_conflicts],
             "summary": {
                 "over_limit_count": len(self.over_limit),
                 "at_limit_count": len(self.at_limit),
                 "under_limit_count": len(self.under_limit),
                 "pto_conflict_count": len(self.pto_conflicts),
+                "holiday_conflict_count": len(self.holiday_conflicts),
             },
         }
 
@@ -204,7 +254,7 @@ class AnalysisResult:
 class MultiMonthAnalysisResult:
     """Analysis results spanning multiple months."""
 
-    results: List[AnalysisResult] = field(default_factory=list)
+    results: list[AnalysisResult] = field(default_factory=list)
     max_days: int = 10
 
     def to_dict(self) -> dict:
@@ -218,5 +268,6 @@ class MultiMonthAnalysisResult:
                 "total_at_limit": sum(len(r.at_limit) for r in self.results),
                 "total_under_limit": sum(len(r.under_limit) for r in self.results),
                 "total_pto_conflicts": sum(len(r.pto_conflicts) for r in self.results),
+                "total_holiday_conflicts": sum(len(r.holiday_conflicts) for r in self.results),
             },
         }

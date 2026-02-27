@@ -3,15 +3,20 @@
 import calendar
 import json
 from datetime import date
-from typing import List
 
 from rich.console import Console
 from rich.table import Table
 
-from oncall_scheduler.models import AnalysisResult, MultiMonthAnalysisResult, OnCallReport, PTOConflict
+from oncall_scheduler.models import (
+    AnalysisResult,
+    HolidayConflict,
+    MultiMonthAnalysisResult,
+    OnCallReport,
+    PTOConflict,
+)
 
 
-def _format_date_ranges(dates: List[date]) -> str:
+def _format_date_ranges(dates: list[date]) -> str:
     """Format a list of dates into compact ranges.
 
     Args:
@@ -83,7 +88,7 @@ def _create_pto_conflicts_table(include_month_column: bool = False) -> Table:
     return table
 
 
-def _format_pto_conflicts_table(conflicts: List[PTOConflict], console: Console, month_label: str | None = None) -> None:
+def _format_pto_conflicts_table(conflicts: list[PTOConflict], console: Console, month_label: str | None = None) -> None:
     """Format and display PTO conflicts as a Rich table.
 
     Args:
@@ -106,7 +111,7 @@ def _format_pto_conflicts_table(conflicts: List[PTOConflict], console: Console, 
     console.print(table)
 
 
-def _format_multi_month_pto_conflicts_table(results: List[AnalysisResult], console: Console) -> int:
+def _format_multi_month_pto_conflicts_table(results: list[AnalysisResult], console: Console) -> int:
     """Format and display PTO conflicts from multiple months as a Rich table.
 
     Args:
@@ -135,9 +140,103 @@ def _format_multi_month_pto_conflicts_table(results: List[AnalysisResult], conso
     return total_pto_conflicts
 
 
+def _add_holiday_conflict_row(
+    table: Table,
+    conflict: HolidayConflict,
+    month_label: str | None = None,
+) -> None:
+    """Add a holiday conflict row to a table.
+
+    Args:
+        table: Rich Table to add the row to
+        conflict: HolidayConflict object
+        month_label: Optional month label for multi-month tables
+    """
+    row = [
+        f"[cyan]{conflict.user.name}[/cyan]",
+        f"[cyan]{conflict.holiday_name}[/cyan]",
+        f"[cyan bold]{conflict.conflicting_date.strftime('%b %d')}[/cyan bold]",
+        f"[cyan]{conflict.schedule_name}[/cyan]",
+    ]
+    if month_label is not None:
+        row.insert(0, f"[cyan]{month_label}[/cyan]")
+    table.add_row(*row)
+
+
+def _create_holiday_conflicts_table(include_month_column: bool = False) -> Table:
+    """Create a holiday conflicts table with appropriate columns.
+
+    Args:
+        include_month_column: Whether to include a Month column
+
+    Returns:
+        Configured Rich Table
+    """
+    table = Table(show_header=True, header_style="bold")
+    if include_month_column:
+        table.add_column("Month")
+    table.add_column("User")
+    table.add_column("Holiday")
+    table.add_column("Date", justify="center")
+    table.add_column("Schedule")
+    return table
+
+
+def _format_holiday_conflicts_table(conflicts: list[HolidayConflict], console: Console, month_label: str | None = None) -> None:
+    """Format and display holiday conflicts as a Rich table.
+
+    Args:
+        conflicts: List of HolidayConflict objects
+        console: Rich Console instance
+        month_label: Optional month label for multi-month display
+    """
+    if not conflicts:
+        return
+
+    console.print()
+    console.print("[bold cyan]Holiday Conflicts - On-Call Days During Holidays[/bold cyan]")
+    console.print()
+
+    table = _create_holiday_conflicts_table(include_month_column=month_label is not None)
+
+    for conflict in conflicts:
+        _add_holiday_conflict_row(table, conflict, month_label)
+
+    console.print(table)
+
+
+def _format_multi_month_holiday_conflicts_table(results: list[AnalysisResult], console: Console) -> int:
+    """Format and display holiday conflicts from multiple months as a Rich table.
+
+    Args:
+        results: List of AnalysisResult objects for each month
+        console: Rich Console instance
+
+    Returns:
+        Total number of holiday conflicts across all months
+    """
+    total_holiday_conflicts = sum(len(r.holiday_conflicts) for r in results)
+    if total_holiday_conflicts == 0:
+        return 0
+
+    console.print()
+    console.print("[bold cyan]Holiday Conflicts - On-Call Days During Holidays[/bold cyan]")
+    console.print()
+
+    table = _create_holiday_conflicts_table(include_month_column=True)
+
+    for month_result in results:
+        month_label = f"{calendar.month_abbr[month_result.month]} {month_result.year}"
+        for conflict in month_result.holiday_conflicts:
+            _add_holiday_conflict_row(table, conflict, month_label)
+
+    console.print(table)
+    return total_holiday_conflicts
+
+
 def _add_rows_to_table(
     table: Table,
-    reports: List[OnCallReport],
+    reports: list[OnCallReport],
     status: str,
     style: str,
     month_label: str | None = None,
@@ -210,6 +309,10 @@ def format_table(result: AnalysisResult) -> None:
     if result.pto_conflicts:
         _format_pto_conflicts_table(result.pto_conflicts, console)
 
+    # Display holiday conflicts if any
+    if result.holiday_conflicts:
+        _format_holiday_conflicts_table(result.holiday_conflicts, console)
+
     # Summary
     console.print()
     summary = (
@@ -219,6 +322,8 @@ def format_table(result: AnalysisResult) -> None:
     )
     if result.pto_conflicts:
         summary += f", [magenta]{len(result.pto_conflicts)} PTO conflicts[/magenta]"
+    if result.holiday_conflicts:
+        summary += f", [cyan]{len(result.holiday_conflicts)} holiday conflicts[/cyan]"
     console.print(summary)
     console.print()
 
@@ -265,6 +370,10 @@ def format_table_verbose(result: AnalysisResult) -> None:
     if result.pto_conflicts:
         _format_pto_conflicts_table(result.pto_conflicts, console)
 
+    # Display holiday conflicts if any
+    if result.holiday_conflicts:
+        _format_holiday_conflicts_table(result.holiday_conflicts, console)
+
     # Summary
     console.print()
     summary = (
@@ -274,6 +383,8 @@ def format_table_verbose(result: AnalysisResult) -> None:
     )
     if result.pto_conflicts:
         summary += f", [magenta]{len(result.pto_conflicts)} PTO conflicts[/magenta]"
+    if result.holiday_conflicts:
+        summary += f", [cyan]{len(result.holiday_conflicts)} holiday conflicts[/cyan]"
     console.print(summary)
     console.print()
 
@@ -339,6 +450,9 @@ def format_multi_month_table(result: MultiMonthAnalysisResult) -> None:
     # Display PTO conflicts if any
     total_pto_conflicts = _format_multi_month_pto_conflicts_table(result.results, console)
 
+    # Display holiday conflicts if any
+    total_holiday_conflicts = _format_multi_month_holiday_conflicts_table(result.results, console)
+
     # Summary
     total_over = sum(len(r.over_limit) for r in result.results)
     total_at = sum(len(r.at_limit) for r in result.results)
@@ -351,6 +465,8 @@ def format_multi_month_table(result: MultiMonthAnalysisResult) -> None:
     )
     if total_pto_conflicts > 0:
         summary += f", [magenta]{total_pto_conflicts} PTO conflicts[/magenta]"
+    if total_holiday_conflicts > 0:
+        summary += f", [cyan]{total_holiday_conflicts} holiday conflicts[/cyan]"
     console.print(summary)
     console.print()
 
@@ -410,6 +526,9 @@ def format_multi_month_table_verbose(result: MultiMonthAnalysisResult) -> None:
     # Display PTO conflicts if any
     total_pto_conflicts = _format_multi_month_pto_conflicts_table(result.results, console)
 
+    # Display holiday conflicts if any
+    total_holiday_conflicts = _format_multi_month_holiday_conflicts_table(result.results, console)
+
     # Summary
     total_over = sum(len(r.over_limit) for r in result.results)
     total_at = sum(len(r.at_limit) for r in result.results)
@@ -423,6 +542,8 @@ def format_multi_month_table_verbose(result: MultiMonthAnalysisResult) -> None:
     )
     if total_pto_conflicts > 0:
         summary += f", [magenta]{total_pto_conflicts} PTO conflicts[/magenta]"
+    if total_holiday_conflicts > 0:
+        summary += f", [cyan]{total_holiday_conflicts} holiday conflicts[/cyan]"
     console.print(summary)
     console.print()
 

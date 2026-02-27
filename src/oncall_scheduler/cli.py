@@ -4,7 +4,6 @@ import json
 import logging
 import sys
 from datetime import datetime
-from typing import List, Optional
 
 import click
 import sentry_sdk
@@ -17,8 +16,8 @@ from oncall_scheduler.api.exceptions import (
     PagerDutyAPIError,
     ResourceNotFoundError,
 )
-from oncall_scheduler.config import load_pto_data, load_settings
-from oncall_scheduler.models import PTOEntry
+from oncall_scheduler.config import load_holiday_data, load_pto_data, load_settings
+from oncall_scheduler.models import HolidayEntry, PTOEntry
 from oncall_scheduler.output.formatter import (
     format_json,
     format_multi_month_table,
@@ -45,7 +44,7 @@ def setup_logging(verbose: bool = False):
     )
 
 
-def init_sentry(dsn: Optional[str], environment: str, verbose: bool = False):
+def init_sentry(dsn: str | None, environment: str, verbose: bool = False):
     """Initialize Sentry SDK for error tracking.
 
     Args:
@@ -148,20 +147,30 @@ def cli():
     "-p",
     "pto_file",
     type=click.Path(exists=True),
+    envvar="PTO_FILE",
     help="Path to JSON file containing PTO data to check for on-call conflicts",
+)
+@click.option(
+    "--holiday-file",
+    "-H",
+    "holiday_file",
+    type=click.Path(exists=True),
+    envvar="HOLIDAY_FILE",
+    help="Path to JSON file containing holiday data to check for on-call conflicts (keyed by timezone)",
 )
 def check(
     teams: tuple,
-    max_days: Optional[int],
-    month: Optional[int],
-    year: Optional[int],
+    max_days: int | None,
+    month: int | None,
+    year: int | None,
     months: int,
     output: str,
     verbose: bool,
     timezones: tuple,
     excluded_users: tuple,
     excluded_schedules: tuple,
-    pto_file: Optional[str],
+    pto_file: str | None,
+    holiday_file: str | None,
 ):
     """Check on-call schedules and identify users over the limit."""
     # Setup logging
@@ -187,7 +196,7 @@ def check(
         sys.exit(1)
 
     # Determine team IDs (CLI args take precedence over config)
-    team_list: List[str] = list(teams) if teams else settings.get_team_ids()
+    team_list: list[str] = list(teams) if teams else settings.get_team_ids()
 
     if not team_list:
         click.echo(
@@ -201,16 +210,16 @@ def check(
     max_days_limit = max_days if max_days is not None else settings.oncall_max_days
 
     # Determine timezones of concern (CLI args take precedence over config)
-    timezones_of_concern_list: List[str] = list(timezones) if timezones else settings.get_timezones_of_concern()
+    timezones_of_concern_list: list[str] = list(timezones) if timezones else settings.get_timezones_of_concern()
 
     # Determine excluded users (CLI args take precedence over config)
-    excluded_users_list: List[str] = list(excluded_users) if excluded_users else settings.get_excluded_users()
+    excluded_users_list: list[str] = list(excluded_users) if excluded_users else settings.get_excluded_users()
 
     # Determine excluded schedules (CLI args take precedence over config)
-    excluded_schedules_list: List[str] = list(excluded_schedules) if excluded_schedules else settings.get_excluded_schedules()
+    excluded_schedules_list: list[str] = list(excluded_schedules) if excluded_schedules else settings.get_excluded_schedules()
 
     # Load PTO data if provided
-    pto_by_email: dict[str, List[PTOEntry]] = {}
+    pto_by_email: dict[str, list[PTOEntry]] = {}
     if pto_file:
         try:
             pto_data = load_pto_data(pto_file)
@@ -223,6 +232,22 @@ def check(
             sys.exit(1)
         except (json.JSONDecodeError, KeyError, ValueError, AttributeError, TypeError) as e:
             click.echo(f"Error parsing PTO file: {e}", err=True)
+            sys.exit(1)
+
+    # Load holiday data if provided
+    holidays_by_timezone: dict[str, list[HolidayEntry]] = {}
+    if holiday_file:
+        try:
+            holiday_data = load_holiday_data(holiday_file)
+            for timezone, holidays in holiday_data.items():
+                holidays_by_timezone[timezone] = [
+                    HolidayEntry.from_dict(timezone, holiday) for holiday in holidays
+                ]
+        except FileNotFoundError as e:
+            click.echo(f"Error: {e}", err=True)
+            sys.exit(1)
+        except (json.JSONDecodeError, KeyError, ValueError, AttributeError, TypeError) as e:
+            click.echo(f"Error parsing holiday file: {e}", err=True)
             sys.exit(1)
 
     # Determine month and year (default to current)
@@ -246,6 +271,9 @@ def check(
         if pto_by_email:
             total_periods = sum(len(periods) for periods in pto_by_email.values())
             click.echo(f"PTO: {len(pto_by_email)} users, {total_periods} periods loaded", err=True)
+        if holidays_by_timezone:
+            total_holidays = sum(len(holidays) for holidays in holidays_by_timezone.values())
+            click.echo(f"Holidays: {len(holidays_by_timezone)} timezones, {total_holidays} holidays loaded", err=True)
         click.echo("", err=True)
 
     try:
@@ -278,6 +306,7 @@ def check(
                 excluded_users=excluded_users_list,
                 excluded_schedules=excluded_schedules_list,
                 pto_by_email=pto_by_email,
+                holidays_by_timezone=holidays_by_timezone,
             )
 
             # Display results
@@ -301,6 +330,7 @@ def check(
                 excluded_users=excluded_users_list,
                 excluded_schedules=excluded_schedules_list,
                 pto_by_email=pto_by_email,
+                holidays_by_timezone=holidays_by_timezone,
             )
 
             # Display results
