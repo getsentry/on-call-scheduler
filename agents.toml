@@ -1,0 +1,16 @@
+version = 1
+# Managed skills are gitignored; collaborators must run 'dotagents install'.
+gitignore = true
+agents = ["claude", "cursor", "codex", "vscode", "opencode"]
+
+[trust]
+github_orgs = [ "getsentry" ]
+
+
+[[skills]]
+name = "dotagents"
+source = "getsentry/dotagents"
+
+[[mcp]]
+name = "notion"
+url = "https://mcp.notion.com/mcp"

@@ -8,6 +8,8 @@ import pytz
 from oncall_scheduler.models import (
     AnalysisResult,
     OnCallReport,
+    PTOConflict,
+    PTOEntry,
     Schedule,
     ScheduleEntry,
     User,
@@ -223,9 +225,11 @@ class TestAnalysisResult:
         assert output["over_limit"] == []
         assert output["at_limit"] == []
         assert output["under_limit"] == []
+        assert output["pto_conflicts"] == []
         assert output["summary"]["over_limit_count"] == 0
         assert output["summary"]["at_limit_count"] == 0
         assert output["summary"]["under_limit_count"] == 0
+        assert output["summary"]["pto_conflict_count"] == 0
 
     def test_to_dict_with_reports(self):
         """Test converting AnalysisResult with reports to dictionary."""
@@ -274,3 +278,133 @@ class TestAnalysisResult:
         assert output["over_limit"][0]["total_days"] == 15
         assert output["at_limit"][0]["total_days"] == 10
         assert output["under_limit"][0]["total_days"] == 5
+
+    def test_to_dict_with_pto_conflicts(self):
+        """Test converting AnalysisResult with PTO conflicts to dictionary."""
+        user = User(id="PUSER1", name="User One", email="user1@example.com")
+
+        conflict = PTOConflict(
+            user=user,
+            schedule_name="Schedule A",
+            conflicting_dates=[date(2026, 1, 15), date(2026, 1, 16)],
+        )
+
+        result = AnalysisResult(
+            month=1,
+            year=2026,
+            max_days=10,
+            pto_conflicts=[conflict],
+        )
+
+        output = result.to_dict()
+
+        assert "pto_conflicts" in output
+        assert len(output["pto_conflicts"]) == 1
+        assert output["pto_conflicts"][0]["conflict_count"] == 2
+        assert output["summary"]["pto_conflict_count"] == 1
+
+
+class TestPTOEntry:
+    """Tests for the PTOEntry model."""
+
+    def test_from_dict_basic(self):
+        """Test creating a PTOEntry from dictionary data."""
+        data = {"start": "2026-02-15", "end": "2026-02-20"}
+
+        entry = PTOEntry.from_dict("user@example.com", data)
+
+        assert entry.user_email == "user@example.com"
+        assert entry.start == date(2026, 2, 15)
+        assert entry.end == date(2026, 2, 20)
+
+    def test_contains_date_within_range(self):
+        """Test that contains_date returns True for dates within PTO range."""
+        entry = PTOEntry(
+            user_email="user@example.com",
+            start=date(2026, 2, 15),
+            end=date(2026, 2, 20),
+        )
+
+        assert entry.contains_date(date(2026, 2, 15))  # Start date
+        assert entry.contains_date(date(2026, 2, 17))  # Middle
+        assert entry.contains_date(date(2026, 2, 20))  # End date
+
+    def test_contains_date_outside_range(self):
+        """Test that contains_date returns False for dates outside PTO range."""
+        entry = PTOEntry(
+            user_email="user@example.com",
+            start=date(2026, 2, 15),
+            end=date(2026, 2, 20),
+        )
+
+        assert not entry.contains_date(date(2026, 2, 14))  # Before
+        assert not entry.contains_date(date(2026, 2, 21))  # After
+        assert not entry.contains_date(date(2026, 1, 17))  # Different month
+
+    def test_from_dict_swapped_dates_raises_error(self):
+        """Test that from_dict raises ValueError when start is after end."""
+        data = {"start": "2026-02-20", "end": "2026-02-15"}
+
+        with pytest.raises(ValueError) as exc_info:
+            PTOEntry.from_dict("user@example.com", data)
+
+        assert "user@example.com" in str(exc_info.value)
+        assert "2026-02-20" in str(exc_info.value)
+        assert "2026-02-15" in str(exc_info.value)
+        assert "start date" in str(exc_info.value).lower()
+        assert "after end date" in str(exc_info.value).lower()
+
+    def test_from_dict_same_day_is_valid(self):
+        """Test that from_dict accepts start and end on the same day."""
+        data = {"start": "2026-02-15", "end": "2026-02-15"}
+
+        entry = PTOEntry.from_dict("user@example.com", data)
+
+        assert entry.start == date(2026, 2, 15)
+        assert entry.end == date(2026, 2, 15)
+        assert entry.contains_date(date(2026, 2, 15))
+
+
+class TestPTOConflict:
+    """Tests for the PTOConflict model."""
+
+    def test_to_dict(self):
+        """Test converting PTOConflict to dictionary."""
+        user = User(
+            id="PUSER123",
+            name="Bob Jones",
+            email="bob@example.com",
+            html_url="https://example.pagerduty.com/users/PUSER123",
+            timezone="America/New_York",
+        )
+
+        conflict = PTOConflict(
+            user=user,
+            schedule_name="Primary On-Call",
+            conflicting_dates=[date(2026, 2, 15), date(2026, 2, 16), date(2026, 2, 17)],
+        )
+
+        result = conflict.to_dict()
+
+        assert result["user"]["id"] == "PUSER123"
+        assert result["user"]["name"] == "Bob Jones"
+        assert result["user"]["email"] == "bob@example.com"
+        assert result["user"]["timezone"] == "America/New_York"
+        assert result["schedule_name"] == "Primary On-Call"
+        assert result["conflicting_dates"] == ["2026-02-15", "2026-02-16", "2026-02-17"]
+        assert result["conflict_count"] == 3
+
+    def test_to_dict_empty_conflicts(self):
+        """Test converting PTOConflict with no conflicts to dictionary."""
+        user = User(id="PUSER123", name="Test User", email="test@example.com")
+
+        conflict = PTOConflict(
+            user=user,
+            schedule_name="Test Schedule",
+            conflicting_dates=[],
+        )
+
+        result = conflict.to_dict()
+
+        assert result["conflicting_dates"] == []
+        assert result["conflict_count"] == 0

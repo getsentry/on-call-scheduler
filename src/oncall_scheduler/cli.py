@@ -1,5 +1,6 @@
 """Command-line interface for the on-call scheduler application."""
 
+import json
 import logging
 import sys
 from datetime import datetime
@@ -16,7 +17,8 @@ from oncall_scheduler.api.exceptions import (
     PagerDutyAPIError,
     ResourceNotFoundError,
 )
-from oncall_scheduler.config import load_settings
+from oncall_scheduler.config import load_pto_data, load_settings
+from oncall_scheduler.models import PTOEntry
 from oncall_scheduler.output.formatter import (
     format_json,
     format_multi_month_table,
@@ -141,6 +143,13 @@ def cli():
     multiple=True,
     help="Exclude specific schedules from analysis by ID or name (can be specified multiple times, e.g. --exclude-schedule SCHEDULE1 --exclude-schedule 'Primary On-Call')",
 )
+@click.option(
+    "--pto-file",
+    "-p",
+    "pto_file",
+    type=click.Path(exists=True),
+    help="Path to JSON file containing PTO data to check for on-call conflicts",
+)
 def check(
     teams: tuple,
     max_days: Optional[int],
@@ -152,6 +161,7 @@ def check(
     timezones: tuple,
     excluded_users: tuple,
     excluded_schedules: tuple,
+    pto_file: Optional[str],
 ):
     """Check on-call schedules and identify users over the limit."""
     # Setup logging
@@ -199,6 +209,22 @@ def check(
     # Determine excluded schedules (CLI args take precedence over config)
     excluded_schedules_list: List[str] = list(excluded_schedules) if excluded_schedules else settings.get_excluded_schedules()
 
+    # Load PTO data if provided
+    pto_by_email: dict[str, List[PTOEntry]] = {}
+    if pto_file:
+        try:
+            pto_data = load_pto_data(pto_file)
+            for user_email, periods in pto_data.items():
+                pto_by_email[user_email] = [
+                    PTOEntry.from_dict(user_email, period) for period in periods
+                ]
+        except FileNotFoundError as e:
+            click.echo(f"Error: {e}", err=True)
+            sys.exit(1)
+        except (json.JSONDecodeError, KeyError, ValueError, AttributeError, TypeError) as e:
+            click.echo(f"Error parsing PTO file: {e}", err=True)
+            sys.exit(1)
+
     # Determine month and year (default to current)
     now = datetime.now()
     target_month = month if month is not None else now.month
@@ -217,6 +243,9 @@ def check(
             click.echo(f"Excluded users: {', '.join(excluded_users_list)}", err=True)
         if excluded_schedules_list:
             click.echo(f"Excluded schedules: {', '.join(excluded_schedules_list)}", err=True)
+        if pto_by_email:
+            total_periods = sum(len(periods) for periods in pto_by_email.values())
+            click.echo(f"PTO: {len(pto_by_email)} users, {total_periods} periods loaded", err=True)
         click.echo("", err=True)
 
     try:
@@ -248,6 +277,7 @@ def check(
                 timezones_of_concern=timezones_of_concern_list,
                 excluded_users=excluded_users_list,
                 excluded_schedules=excluded_schedules_list,
+                pto_by_email=pto_by_email,
             )
 
             # Display results
@@ -270,6 +300,7 @@ def check(
                 timezones_of_concern=timezones_of_concern_list,
                 excluded_users=excluded_users_list,
                 excluded_schedules=excluded_schedules_list,
+                pto_by_email=pto_by_email,
             )
 
             # Display results
