@@ -2,7 +2,6 @@
 
 import json
 from pathlib import Path
-from typing import Dict, List, Optional
 
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -26,7 +25,7 @@ class Settings(BaseSettings):
     )
 
     # Optional settings
-    pagerduty_team_ids: Optional[str] = Field(
+    pagerduty_team_ids: str | None = Field(
         default=None,
         description="Comma-separated list of PagerDuty team IDs",
         validation_alias="PAGERDUTY_TEAM_IDS",
@@ -43,7 +42,7 @@ class Settings(BaseSettings):
         description="Default timezone for calculations",
     )
 
-    sentry_dsn: Optional[str] = Field(
+    sentry_dsn: str | None = Field(
         default=None,
         description="Sentry DSN for error tracking",
         validation_alias="SENTRY_DSN",
@@ -55,7 +54,7 @@ class Settings(BaseSettings):
         validation_alias="SENTRY_ENVIRONMENT",
     )
 
-    user_timezones: Optional[str] = Field(
+    user_timezones: str | None = Field(
         default=None,
         description="JSON mapping of user emails to timezones, e.g. '{\"user@example.com\": \"America/New_York\"}'",
         validation_alias="USER_TIMEZONES",
@@ -67,31 +66,43 @@ class Settings(BaseSettings):
         validation_alias="WORKDAY_END_HOUR",
     )
 
-    timezones_of_concern: Optional[str] = Field(
+    timezones_of_concern: str | None = Field(
         default=None,
         description="Comma-separated list of timezones to include in analysis (e.g. 'America/New_York,Europe/London'). If not specified, all timezones are included.",
         validation_alias="TIMEZONES_OF_CONCERN",
     )
 
-    excluded_users: Optional[str] = Field(
+    excluded_users: str | None = Field(
         default=None,
         description="Comma-separated list of user emails to exclude from over-limit reporting (e.g. 'user1@example.com,user2@example.com').",
         validation_alias="EXCLUDED_USERS",
     )
 
-    excluded_schedules: Optional[str] = Field(
+    excluded_schedules: str | None = Field(
         default=None,
         description="Comma-separated list of schedule IDs or names to exclude from analysis (e.g. 'SCHEDULE1,SCHEDULE2' or 'Primary On-Call,Secondary').",
         validation_alias="EXCLUDED_SCHEDULES",
     )
 
-    def get_team_ids(self) -> List[str]:
+    pto_file: str | None = Field(
+        default=None,
+        description="Path to JSON file containing PTO data to check for on-call conflicts.",
+        validation_alias="PTO_FILE",
+    )
+
+    holiday_file: str | None = Field(
+        default=None,
+        description="Path to JSON file containing holiday data to check for on-call conflicts (keyed by timezone).",
+        validation_alias="HOLIDAY_FILE",
+    )
+
+    def get_team_ids(self) -> list[str]:
         """Parse and return team IDs as a list."""
         if not self.pagerduty_team_ids:
             return []
         return [team_id.strip() for team_id in self.pagerduty_team_ids.split(",")]
 
-    def get_user_timezones(self) -> Dict[str, str]:
+    def get_user_timezones(self) -> dict[str, str]:
         """Parse and return user timezone mappings.
 
         Returns:
@@ -116,7 +127,7 @@ class Settings(BaseSettings):
         user_tz_map = self.get_user_timezones()
         return user_tz_map.get(email, self.timezone)
 
-    def get_timezones_of_concern(self) -> List[str]:
+    def get_timezones_of_concern(self) -> list[str]:
         """Parse and return timezones of concern as a list.
 
         Returns:
@@ -126,7 +137,7 @@ class Settings(BaseSettings):
             return []
         return [tz.strip() for tz in self.timezones_of_concern.split(",")]
 
-    def get_excluded_users(self) -> List[str]:
+    def get_excluded_users(self) -> list[str]:
         """Parse and return excluded users as a list.
 
         Returns:
@@ -136,7 +147,7 @@ class Settings(BaseSettings):
             return []
         return [email.strip() for email in self.excluded_users.split(",")]
 
-    def get_excluded_schedules(self) -> List[str]:
+    def get_excluded_schedules(self) -> list[str]:
         """Parse and return excluded schedules as a list.
 
         Returns:
@@ -152,7 +163,7 @@ def load_settings() -> Settings:
     return Settings()
 
 
-def load_pto_data(pto_file: str) -> Dict[str, List[Dict[str, str]]]:
+def load_pto_data(pto_file: str) -> dict[str, list[dict[str, str]]]:
     """Load PTO data from a JSON file.
 
     Expected format:
@@ -180,5 +191,38 @@ def load_pto_data(pto_file: str) -> Dict[str, List[Dict[str, str]]]:
     if not path.exists():
         raise FileNotFoundError(f"PTO file not found: {pto_file}")
 
-    with open(path, "r", encoding="utf-8") as f:
+    with open(path, encoding="utf-8") as f:
+        return json.load(f)
+
+
+def load_holiday_data(holiday_file: str) -> dict[str, list[dict[str, str]]]:
+    """Load holiday data from a JSON file.
+
+    Expected format:
+    {
+        "America/New_York": [
+            {"date": "2026-01-01", "name": "New Year's Day"},
+            {"date": "2026-07-04", "name": "Independence Day"}
+        ],
+        "Europe/London": [
+            {"date": "2026-01-01", "name": "New Year's Day"},
+            {"date": "2026-12-25", "name": "Christmas Day"}
+        ]
+    }
+
+    Args:
+        holiday_file: Path to the holiday JSON file
+
+    Returns:
+        Dictionary mapping timezones to lists of holiday entries
+
+    Raises:
+        FileNotFoundError: If the holiday file does not exist
+        json.JSONDecodeError: If the file is not valid JSON
+    """
+    path = Path(holiday_file)
+    if not path.exists():
+        raise FileNotFoundError(f"Holiday file not found: {holiday_file}")
+
+    with open(path, encoding="utf-8") as f:
         return json.load(f)
