@@ -78,7 +78,6 @@ def _find_holiday_conflicts(
     user_schedule_days: dict[str, dict[str, set]],
     users: dict[str, User],
     holidays_by_timezone: dict[str, list[HolidayEntry]],
-<<<<<<< HEAD
     included_schedules: list[str] | None = None,
     excluded_schedules: list[str] | None = None,
 ) -> list[HolidayConflict]:
@@ -116,31 +115,7 @@ def _find_holiday_conflicts(
             # Skip schedules in the exclusion list
             if schedule_name in excluded_schedules:
                 continue
-||||||| b6f0624
-=======
-) -> list[HolidayConflict]:
-    """Find conflicts between on-call schedules and holidays.
 
-    Args:
-        user_schedule_days: Dictionary mapping user IDs to schedule names to sets of on-call dates
-        users: Dictionary mapping user IDs to User objects
-        holidays_by_timezone: Dictionary mapping timezones to lists of HolidayEntry objects
-
-    Returns:
-        List of HolidayConflict objects for users with conflicts
-    """
-    conflicts = []
-
-    for user_id, schedule_dates in user_schedule_days.items():
-        user = users[user_id]
-        user_holidays = holidays_by_timezone.get(user.timezone, [])
-
-        if not user_holidays:
-            continue
-
-        # Check each schedule separately
-        for schedule_name, dates in schedule_dates.items():
->>>>>>> main
             # Find dates that conflict with holidays for this schedule
             for holiday in user_holidays:
                 if holiday.date in dates:
@@ -174,17 +149,8 @@ def analyze_schedules(
     excluded_schedules: list[str] | None = None,
     pto_by_email: dict[str, list[PTOEntry]] | None = None,
     holidays_by_timezone: dict[str, list[HolidayEntry]] | None = None,
-<<<<<<< HEAD
     included_schedules_for_holidays: list[str] | None = None,
     excluded_schedules_for_holidays: list[str] | None = None,
-||||||| b6f0624
-    user_timezones: Optional[Dict[str, str]] = None,
-    timezones_of_concern: Optional[List[str]] = None,
-    excluded_users: Optional[List[str]] = None,
-    excluded_schedules: Optional[List[str]] = None,
-    pto_by_email: Optional[Dict[str, List[PTOEntry]]] = None,
-=======
->>>>>>> main
 ) -> AnalysisResult:
     """Analyze on-call schedules for teams and identify users over the limit.
 
@@ -204,13 +170,9 @@ def analyze_schedules(
         excluded_schedules: Optional list of schedule IDs or names to exclude from analysis
         pto_by_email: Optional dict mapping user emails to lists of PTO entries
         holidays_by_timezone: Optional dict mapping timezones to lists of HolidayEntry objects
-<<<<<<< HEAD
-        included_schedules_for_holidays: Optional list of schedule names to check for holiday conflicts.
+        included_schedules_for_holidays: Optional list of schedule IDs or names to check for holiday conflicts.
             If empty/None, all schedules are checked.
-        excluded_schedules_for_holidays: Optional list of schedule names to exclude from holiday conflict checking.
-||||||| b6f0624
-=======
->>>>>>> main
+        excluded_schedules_for_holidays: Optional list of schedule IDs or names to exclude from holiday conflict checking.
 
     Returns:
         AnalysisResult containing categorized user reports
@@ -231,14 +193,10 @@ def analyze_schedules(
         pto_by_email = {}
     if holidays_by_timezone is None:
         holidays_by_timezone = {}
-<<<<<<< HEAD
     if included_schedules_for_holidays is None:
         included_schedules_for_holidays = []
     if excluded_schedules_for_holidays is None:
         excluded_schedules_for_holidays = []
-||||||| b6f0624
-=======
->>>>>>> main
 
     logger.info(f"Starting analysis for {len(team_ids)} teams in {month}/{year}")
     logger.info(f"Maximum days limit: {max_days}")
@@ -257,14 +215,10 @@ def analyze_schedules(
     if holidays_by_timezone:
         total_holidays = sum(len(holidays) for holidays in holidays_by_timezone.values())
         logger.info(f"Checking holidays for {len(holidays_by_timezone)} timezones ({total_holidays} holidays)")
-<<<<<<< HEAD
     if included_schedules_for_holidays:
         logger.info(f"Holiday conflict schedules limited to: {', '.join(included_schedules_for_holidays)}")
     if excluded_schedules_for_holidays:
         logger.info(f"Holiday conflict schedules excluded: {', '.join(excluded_schedules_for_holidays)}")
-||||||| b6f0624
-=======
->>>>>>> main
 
     # Step 1: Fetch schedules for the specified teams
     all_schedules = client.get_schedules_by_team(team_ids)
@@ -284,6 +238,15 @@ def analyze_schedules(
     if not schedules:
         logger.warning("No schedules remaining after exclusions")
         return AnalysisResult(month=month, year=year, max_days=max_days)
+
+    # Resolve schedule IDs to names for holiday include/exclude filters
+    schedule_name_by_id = {s.id: s.name for s in schedules}
+    included_schedules_for_holidays_names = [
+        schedule_name_by_id.get(s, s) for s in included_schedules_for_holidays
+    ]
+    excluded_schedules_for_holidays_names = [
+        schedule_name_by_id.get(s, s) for s in excluded_schedules_for_holidays
+    ]
 
     schedule_ids = [schedule.id for schedule in schedules]
     logger.info(f"Analyzing {len(schedules)} schedules: {', '.join(s.name for s in schedules)}")
@@ -355,18 +318,13 @@ def analyze_schedules(
     # Step 5d: Check for holiday conflicts (using filtered data)
     holiday_conflicts = []
     if holidays_by_timezone:
-<<<<<<< HEAD
         holiday_conflicts = _find_holiday_conflicts(
             filtered_user_schedule_days,
             users,
             holidays_by_timezone,
-            included_schedules_for_holidays,
-            excluded_schedules_for_holidays,
+            included_schedules_for_holidays_names,
+            excluded_schedules_for_holidays_names,
         )
-||||||| b6f0624
-=======
-        holiday_conflicts = _find_holiday_conflicts(filtered_user_schedule_days, users, holidays_by_timezone)
->>>>>>> main
 
     # Step 6: Categorize users by their on-call days
     over_limit = []
@@ -442,17 +400,8 @@ def analyze_multiple_months(
     excluded_schedules: list[str] | None = None,
     pto_by_email: dict[str, list[PTOEntry]] | None = None,
     holidays_by_timezone: dict[str, list[HolidayEntry]] | None = None,
-<<<<<<< HEAD
     included_schedules_for_holidays: list[str] | None = None,
     excluded_schedules_for_holidays: list[str] | None = None,
-||||||| b6f0624
-    user_timezones: Optional[Dict[str, str]] = None,
-    timezones_of_concern: Optional[List[str]] = None,
-    excluded_users: Optional[List[str]] = None,
-    excluded_schedules: Optional[List[str]] = None,
-    pto_by_email: Optional[Dict[str, List[PTOEntry]]] = None,
-=======
->>>>>>> main
 ) -> MultiMonthAnalysisResult:
     """Analyze on-call schedules for multiple consecutive months.
 
@@ -473,13 +422,9 @@ def analyze_multiple_months(
         excluded_schedules: Optional list of schedule IDs or names to exclude from analysis
         pto_by_email: Optional dict mapping user emails to lists of PTO entries
         holidays_by_timezone: Optional dict mapping timezones to lists of HolidayEntry objects
-<<<<<<< HEAD
-        included_schedules_for_holidays: Optional list of schedule names to check for holiday conflicts.
+        included_schedules_for_holidays: Optional list of schedule IDs or names to check for holiday conflicts.
             If empty/None, all schedules are checked.
-        excluded_schedules_for_holidays: Optional list of schedule names to exclude from holiday conflict checking.
-||||||| b6f0624
-=======
->>>>>>> main
+        excluded_schedules_for_holidays: Optional list of schedule IDs or names to exclude from holiday conflict checking.
 
     Returns:
         MultiMonthAnalysisResult containing results for each month
@@ -494,14 +439,10 @@ def analyze_multiple_months(
         pto_by_email = {}
     if holidays_by_timezone is None:
         holidays_by_timezone = {}
-<<<<<<< HEAD
     if included_schedules_for_holidays is None:
         included_schedules_for_holidays = []
     if excluded_schedules_for_holidays is None:
         excluded_schedules_for_holidays = []
-||||||| b6f0624
-=======
->>>>>>> main
 
     logger.info(f"Analyzing {num_months} months starting from {start_month}/{start_year}")
 
@@ -523,12 +464,8 @@ def analyze_multiple_months(
             excluded_schedules=excluded_schedules,
             pto_by_email=pto_by_email,
             holidays_by_timezone=holidays_by_timezone,
-<<<<<<< HEAD
             included_schedules_for_holidays=included_schedules_for_holidays,
             excluded_schedules_for_holidays=excluded_schedules_for_holidays,
-||||||| b6f0624
-=======
->>>>>>> main
         )
         results.append(result)
 

@@ -30,6 +30,18 @@ from oncall_scheduler.output.formatter import (
 __version__ = "0.1.0"
 
 
+def _split_click_multiple(value: tuple) -> list[str]:
+    """Split Click multiple option values that may be comma-separated from env vars.
+
+    Click's envvar handling for multiple=True options passes the entire env var string
+    as a single item rather than splitting on commas. This function normalizes both cases.
+    """
+    result = []
+    for item in value:
+        result.extend(s.strip() for s in item.split(",") if s.strip())
+    return result
+
+
 def setup_logging(verbose: bool = False):
     """Configure logging for the application.
 
@@ -235,10 +247,10 @@ def check(
     excluded_schedules_list: list[str] = list(excluded_schedules) if excluded_schedules else settings.get_excluded_schedules()
 
     # Determine included schedules for holidays (CLI args take precedence over config)
-    included_schedules_for_holidays_list: list[str] = list(included_schedules_for_holidays) if included_schedules_for_holidays else settings.get_included_schedules_for_holidays()
+    included_schedules_for_holidays_list: list[str] = _split_click_multiple(included_schedules_for_holidays) if included_schedules_for_holidays else settings.get_included_schedules_for_holidays()
 
     # Determine excluded schedules for holidays (CLI args take precedence over config)
-    excluded_schedules_for_holidays_list: list[str] = list(excluded_schedules_for_holidays) if excluded_schedules_for_holidays else settings.get_excluded_schedules_for_holidays()
+    excluded_schedules_for_holidays_list: list[str] = _split_click_multiple(excluded_schedules_for_holidays) if excluded_schedules_for_holidays else settings.get_excluded_schedules_for_holidays()
 
     # Determine PTO file (CLI arg takes precedence over config)
     pto_file_path = pto_file if pto_file else settings.pto_file
