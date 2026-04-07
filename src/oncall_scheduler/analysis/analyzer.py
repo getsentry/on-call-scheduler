@@ -240,6 +240,24 @@ def analyze_schedules(
         return AnalysisResult(month=month, year=year, max_days=max_days)
 
     # Resolve schedule IDs to names for holiday include/exclude filters
+    # Validate against all_schedules so unknown identifiers are caught regardless
+    # of whether the schedule was also in --exclude-schedule
+    all_schedule_ids = {s.id for s in all_schedules}
+    all_schedule_names = {s.name for s in all_schedules}
+    all_schedule_identifiers = all_schedule_ids | all_schedule_names
+
+    invalid = [
+        s
+        for s in included_schedules_for_holidays + excluded_schedules_for_holidays
+        if s not in all_schedule_identifiers
+    ]
+    if invalid:
+        valid_names = ", ".join(sorted(s.name for s in all_schedules))
+        raise ValueError(
+            f"Unknown schedule identifier(s) in holiday filters: {', '.join(invalid)}. "
+            f"Valid schedules for these teams: {valid_names}"
+        )
+
     schedule_name_by_id = {s.id: s.name for s in schedules}
     included_schedules_for_holidays_names = [
         schedule_name_by_id.get(s, s) for s in included_schedules_for_holidays
