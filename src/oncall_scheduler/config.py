@@ -96,6 +96,18 @@ class Settings(BaseSettings):
         validation_alias="HOLIDAY_FILE",
     )
 
+    include_schedules_for_holidays: str | None = Field(
+        default=None,
+        description="Comma-separated list of schedule IDs or names to include for holiday conflict checking. If not specified, all schedules are checked.",
+        validation_alias="INCLUDE_SCHEDULES_FROM_HOLIDAYS",
+    )
+
+    exclude_schedules_for_holidays: str | None = Field(
+        default=None,
+        description="Comma-separated list of schedule IDs or names to exclude from holiday conflict checking.",
+        validation_alias="EXCLUDE_SCHEDULES_FROM_HOLIDAYS",
+    )
+
     def get_team_ids(self) -> list[str]:
         """Parse and return team IDs as a list."""
         if not self.pagerduty_team_ids:
@@ -156,6 +168,26 @@ class Settings(BaseSettings):
         if not self.excluded_schedules:
             return []
         return [schedule.strip() for schedule in self.excluded_schedules.split(",")]
+
+    def get_included_schedules_for_holidays(self) -> list[str]:
+        """Parse and return schedules to include for holiday conflict checking.
+
+        Returns:
+            List of schedule IDs or names to include for holiday checking. Empty list means all schedules are checked.
+        """
+        if not self.include_schedules_for_holidays:
+            return []
+        return [schedule.strip() for schedule in self.include_schedules_for_holidays.split(",")]
+
+    def get_excluded_schedules_for_holidays(self) -> list[str]:
+        """Parse and return schedules to exclude from holiday conflict checking.
+
+        Returns:
+            List of schedule IDs or names to exclude from holiday checking. Empty list means no schedules are excluded.
+        """
+        if not self.exclude_schedules_for_holidays:
+            return []
+        return [schedule.strip() for schedule in self.exclude_schedules_for_holidays.split(",")]
 
 
 def load_settings() -> Settings:
