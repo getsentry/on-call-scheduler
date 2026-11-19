@@ -6,6 +6,7 @@ from io import StringIO
 from unittest.mock import patch
 
 import pytest
+from rich.table import Table
 
 from oncall_scheduler.models import AnalysisResult, OnCallReport, User
 from oncall_scheduler.output.formatter import (
@@ -269,8 +270,16 @@ class TestFormatTableVerbose:
         format_table_verbose(result)
 
         assert mock_console.print.called
-        # Should show all three categories
-        print_calls = [str(call) for call in mock_console.print.call_args_list]
-        assert any("OVER LIMIT" in str(call) for call in print_calls)
-        assert any("AT LIMIT" in str(call) for call in print_calls)
-        assert any("UNDER LIMIT" in str(call) for call in print_calls)
+        # All three categories go into one combined table, one row each,
+        # with the category in the Status column
+        printed = [call.args[0] for call in mock_console.print.call_args_list if call.args]
+        tables = [arg for arg in printed if isinstance(arg, Table)]
+        assert len(tables) == 1
+        status_cells = list(tables[0].columns[-1].cells)
+        assert status_cells == ["[red]Over[/red]", "[yellow]At[/yellow]", "[green]Under[/green]"]
+
+        # The summary line reports the count for each category
+        summary = next(arg for arg in printed if isinstance(arg, str) and "Summary" in arg)
+        assert "1 over limit" in summary
+        assert "1 at limit" in summary
+        assert "1 under limit" in summary

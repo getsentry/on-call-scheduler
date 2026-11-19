@@ -3,7 +3,7 @@
 import calendar
 import logging
 from collections import defaultdict
-from datetime import datetime
+from datetime import datetime, timedelta
 
 import pytz
 
@@ -269,17 +269,17 @@ def analyze_schedules(
     schedule_ids = [schedule.id for schedule in schedules]
     logger.info(f"Analyzing {len(schedules)} schedules: {', '.join(s.name for s in schedules)}")
 
-    # Step 2: Calculate date range for the month
+    # Step 2: Calculate date range for the month. These are calendar boundaries:
+    # get_dates_in_range applies them in each user's own timezone.
     month_start = datetime(year, month, 1)
     last_day = calendar.monthrange(year, month)[1]
     month_end = datetime(year, month, last_day, 23, 59, 59)
 
-    # Make timezone-aware (UTC)
-    month_start = pytz.utc.localize(month_start)
-    month_end = pytz.utc.localize(month_end)
-
-    # Step 3: Fetch on-call entries for the month with user timezone configuration
-    entries = client.get_oncalls(schedule_ids, month_start, month_end, user_timezones)
+    # Step 3: Fetch on-call entries with user timezone configuration. Local months run
+    # from UTC-12 to UTC+14, so pad the UTC month by a day on each side to cover them all.
+    fetch_since = pytz.utc.localize(month_start) - timedelta(days=1)
+    fetch_until = pytz.utc.localize(month_end) + timedelta(days=1)
+    entries = client.get_oncalls(schedule_ids, fetch_since, fetch_until, user_timezones)
 
     if not entries:
         logger.warning("No on-call entries found for the specified period")

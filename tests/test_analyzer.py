@@ -1,6 +1,6 @@
 """Tests for the on-call schedule analyzer."""
 
-from datetime import datetime
+from datetime import date, datetime
 from unittest.mock import Mock, patch
 
 import pytest
@@ -288,10 +288,49 @@ class TestAnalyzeSchedules:
         until = call_args[0][2]
 
         assert schedule_ids == ["PSCHED1"]
-        assert since.month == 2
-        assert since.year == 2026
-        assert until.month == 2
-        assert until.year == 2026
+        # The UTC month is padded by a day on each side so every user's local month
+        # (UTC-12 to UTC+14) is covered
+        assert since == pytz.utc.localize(datetime(2026, 1, 31, 0, 0, 0))
+        assert until == pytz.utc.localize(datetime(2026, 3, 1, 23, 59, 59))
+
+    def test_analyze_schedules_counts_days_in_users_local_month(self):
+        """Test that month boundaries follow each user's timezone, not UTC."""
+        schedule = Schedule(id="PSCHED1", name="Test Schedule", timezone="UTC")
+        vienna = User(
+            id="PVIENNA", name="Vienna User", email="vienna@example.com", timezone="Europe/Vienna"
+        )
+        la = User(id="PLA", name="LA User", email="la@example.com", timezone="America/Los_Angeles")
+
+        entries = [
+            # Vienna (UTC+1): Jan 31 09:00 to Feb 2 09:00 local. Feb 1 is February locally,
+            # even though UTC January ends at 01:00 Vienna time on Feb 1.
+            ScheduleEntry(
+                user=vienna,
+                schedule=schedule,
+                start=pytz.utc.localize(datetime(2026, 1, 31, 8, 0, 0)),
+                end=pytz.utc.localize(datetime(2026, 2, 2, 8, 0, 0)),
+            ),
+            # Los Angeles (UTC-8): Dec 31 15:00 to Jan 1 19:00 local. Dec 31 is December
+            # locally, even though UTC January starts at 16:00 LA time on Dec 31.
+            ScheduleEntry(
+                user=la,
+                schedule=schedule,
+                start=pytz.utc.localize(datetime(2025, 12, 31, 23, 0, 0)),
+                end=pytz.utc.localize(datetime(2026, 1, 2, 3, 0, 0)),
+            ),
+        ]
+
+        mock_client = Mock()
+        mock_client.get_schedules_by_team.return_value = [schedule]
+        mock_client.get_oncalls.return_value = entries
+
+        result = analyze_schedules(
+            team_ids=["TEAM1"], month=1, year=2026, max_days=10, client=mock_client
+        )
+
+        dates_by_user = {r.user.id: r.scheduled_dates for r in result.under_limit}
+        assert dates_by_user["PVIENNA"] == [date(2026, 1, 31)]
+        assert dates_by_user["PLA"] == [date(2026, 1, 1)]
 
     def test_analyze_schedules_excluded_users(self):
         """Test that excluded users are filtered from the results."""

@@ -33,7 +33,12 @@ def _format_date_ranges(dates: list[date]) -> str:
     prev = dates[0]
 
     for current in dates[1:] + [None]:  # Add None to trigger final range
-        if current is None or (current - prev).days > 1:
+        # Break on gaps and on month changes so "Jan 30-31, Feb 01-02" is never "Jan 30-02"
+        if (
+            current is None
+            or (current - prev).days > 1
+            or (current.year, current.month) != (prev.year, prev.month)
+        ):
             # End of a range
             if start == prev:
                 ranges.append(start.strftime("%b %d"))
