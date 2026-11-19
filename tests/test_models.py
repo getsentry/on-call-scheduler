@@ -1,9 +1,8 @@
 """Tests for data models."""
 
-from datetime import date, datetime
+from datetime import date
 
 import pytest
-import pytz
 
 from oncall_scheduler.models import (
     AnalysisResult,
