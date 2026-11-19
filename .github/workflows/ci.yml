@@ -56,12 +56,9 @@ jobs:
         run: uv run ruff format --check --diff .
 
   typecheck:
-    name: Type check (non-blocking)
+    name: Type check
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    # mypy has known errors on main; report them without failing the workflow
-    # until they're fixed, then remove continue-on-error.
-    continue-on-error: true
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:

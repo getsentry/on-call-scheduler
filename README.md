@@ -324,7 +324,7 @@ uv run ruff check .
 uv run mypy src/oncall_scheduler
 ```
 
-CI runs `ruff format --check` and `ruff check` on every pull request and fails if either reports anything. mypy also runs in CI, but it doesn't block merges yet.
+CI runs `ruff format --check`, `ruff check` and `mypy` on every pull request and fails if any of them reports anything.
 
 ## Troubleshooting
 
