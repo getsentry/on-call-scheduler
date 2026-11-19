@@ -16,8 +16,8 @@ logger = logging.getLogger(__name__)
 def get_dates_in_range(
     start: datetime,
     end: datetime,
-    month_start: datetime,
-    month_end: datetime,
+    month_start: datetime | None,
+    month_end: datetime | None,
     timezone_str: str = "UTC",
     workday_end_hour: int = 17,
 ) -> Set[date]:
@@ -27,10 +27,13 @@ def get_dates_in_range(
     standard workday end hour (e.g., 5 PM) in the specified timezone.
 
     Args:
-        start: Start datetime of the on-call shift
-        end: End datetime of the on-call shift
-        month_start: Start datetime of the target month
-        month_end: End datetime of the target month
+        start: Start datetime of the on-call shift (naive values are treated as UTC)
+        end: End datetime of the on-call shift (naive values are treated as UTC)
+        month_start: Wall-clock start of the target period, e.g. ``datetime(2026, 1, 1)``.
+            It is applied in the user's timezone, so the period starts at local midnight
+            for every user; any tzinfo on it is ignored. None means no lower bound.
+        month_end: Wall-clock end of the target period, e.g. ``datetime(2026, 1, 31, 23, 59,
+            59)``, applied in the user's timezone like month_start. None means no upper bound.
         timezone_str: Timezone string for the user (e.g., "America/New_York")
         workday_end_hour: Hour (0-23) when standard workday ends (default: 17 for 5 PM)
 
@@ -40,25 +43,22 @@ def get_dates_in_range(
     # Convert to the user's timezone
     tz = pytz.timezone(timezone_str)
 
-    # Ensure all datetimes are timezone-aware
+    # Shift times are instants: treat naive values as UTC, then convert to the user's timezone
     if start.tzinfo is None:
         start = pytz.utc.localize(start)
     if end.tzinfo is None:
         end = pytz.utc.localize(end)
-    if month_start.tzinfo is None:
-        month_start = pytz.utc.localize(month_start)
-    if month_end.tzinfo is None:
-        month_end = pytz.utc.localize(month_end)
-
-    # Convert to user's timezone
     start = start.astimezone(tz)
     end = end.astimezone(tz)
-    month_start = month_start.astimezone(tz)
-    month_end = month_end.astimezone(tz)
 
-    # Clamp the range to the month boundaries
-    actual_start = max(start, month_start)
-    actual_end = min(end, month_end)
+    # Month boundaries are calendar boundaries: the same wall-clock time in every user's
+    # timezone, so "January" means local January rather than UTC January
+    actual_start = start
+    actual_end = end
+    if month_start is not None:
+        actual_start = max(start, tz.localize(month_start.replace(tzinfo=None)))
+    if month_end is not None:
+        actual_end = min(end, tz.localize(month_end.replace(tzinfo=None)))
 
     # If the shift doesn't overlap with the month, return empty set
     if actual_start >= actual_end:
@@ -119,14 +119,10 @@ def calculate_oncall_days(
     Returns:
         Dictionary mapping user_id to a set of dates they had after-hours on-call coverage
     """
-    # Calculate month boundaries
+    # Calendar month boundaries; get_dates_in_range applies them in each user's timezone
     month_start = datetime(year, month, 1)
     last_day = calendar.monthrange(year, month)[1]
     month_end = datetime(year, month, last_day, 23, 59, 59)
-
-    # Make month boundaries timezone-aware (UTC)
-    month_start = pytz.utc.localize(month_start)
-    month_end = pytz.utc.localize(month_end)
 
     user_days = defaultdict(set)
 
@@ -175,8 +171,8 @@ def get_user_schedule_days(
             entry_dates = get_dates_in_range(
                 entry.start,
                 entry.end,
-                entry.start,  # No month boundary filtering
-                entry.end,
+                None,  # No month boundary filtering
+                None,
                 entry.user.timezone,
                 workday_end_hour,
             )

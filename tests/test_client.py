@@ -23,15 +23,14 @@ class TestPagerDutyClient:
 
     def test_init(self):
         """Test client initialization."""
-        client = PagerDutyClient(api_key="test_key", from_email="test@example.com")
+        client = PagerDutyClient(api_key="test_key")
 
         assert client.api_key == "test_key"
-        assert client.from_email == "test@example.com"
         assert client.client is None
 
     def test_get_client_creates_client(self):
         """Test that _get_client creates a client on first call."""
-        client = PagerDutyClient(api_key="test_key", from_email="test@example.com")
+        client = PagerDutyClient(api_key="test_key")
 
         with patch("oncall_scheduler.api.client.pagerduty.RestApiV2Client") as mock_client_class:
             result = client._get_client()
@@ -41,7 +40,7 @@ class TestPagerDutyClient:
 
     def test_get_client_reuses_client(self):
         """Test that _get_client reuses existing client."""
-        client = PagerDutyClient(api_key="test_key", from_email="test@example.com")
+        client = PagerDutyClient(api_key="test_key")
         mock_api_client = Mock()
         client.client = mock_api_client
 
@@ -51,7 +50,7 @@ class TestPagerDutyClient:
 
     def test_handle_api_error_401_authentication(self):
         """Test handling 401 authentication errors."""
-        client = PagerDutyClient(api_key="test_key", from_email="test@example.com")
+        client = PagerDutyClient(api_key="test_key")
 
         with pytest.raises(AuthenticationError) as exc_info:
             client._handle_api_error(Exception("401 Unauthorized"))
@@ -60,7 +59,7 @@ class TestPagerDutyClient:
 
     def test_handle_api_error_403_authentication(self):
         """Test handling 403 authentication errors."""
-        client = PagerDutyClient(api_key="test_key", from_email="test@example.com")
+        client = PagerDutyClient(api_key="test_key")
 
         with pytest.raises(AuthenticationError) as exc_info:
             client._handle_api_error(Exception("403 Forbidden"))
@@ -69,7 +68,7 @@ class TestPagerDutyClient:
 
     def test_handle_api_error_429_rate_limit(self):
         """Test handling 429 rate limit errors."""
-        client = PagerDutyClient(api_key="test_key", from_email="test@example.com")
+        client = PagerDutyClient(api_key="test_key")
 
         with pytest.raises(RateLimitError) as exc_info:
             client._handle_api_error(Exception("429 Too Many Requests"))
@@ -78,7 +77,7 @@ class TestPagerDutyClient:
 
     def test_handle_api_error_404_not_found(self):
         """Test handling 404 not found errors."""
-        client = PagerDutyClient(api_key="test_key", from_email="test@example.com")
+        client = PagerDutyClient(api_key="test_key")
 
         with pytest.raises(ResourceNotFoundError) as exc_info:
             client._handle_api_error(Exception("404 Not Found"))
@@ -87,7 +86,7 @@ class TestPagerDutyClient:
 
     def test_handle_api_error_timeout(self):
         """Test handling timeout errors."""
-        client = PagerDutyClient(api_key="test_key", from_email="test@example.com")
+        client = PagerDutyClient(api_key="test_key")
 
         with pytest.raises(NetworkError) as exc_info:
             client._handle_api_error(Exception("Connection timeout"))
@@ -96,7 +95,7 @@ class TestPagerDutyClient:
 
     def test_handle_api_error_generic(self):
         """Test handling generic API errors."""
-        client = PagerDutyClient(api_key="test_key", from_email="test@example.com")
+        client = PagerDutyClient(api_key="test_key")
 
         with pytest.raises(PagerDutyAPIError) as exc_info:
             client._handle_api_error(Exception("Some other error"))
@@ -105,7 +104,7 @@ class TestPagerDutyClient:
 
     def test_get_schedules_by_team_success(self):
         """Test successfully fetching schedules by team."""
-        client = PagerDutyClient(api_key="test_key", from_email="test@example.com")
+        client = PagerDutyClient(api_key="test_key")
 
         mock_api_client = Mock()
         mock_api_client.iter_all.return_value = iter([
@@ -133,7 +132,7 @@ class TestPagerDutyClient:
 
     def test_get_schedules_by_team_multiple_teams(self):
         """Test fetching schedules for multiple teams."""
-        client = PagerDutyClient(api_key="test_key", from_email="test@example.com")
+        client = PagerDutyClient(api_key="test_key")
 
         mock_api_client = Mock()
         # First call returns schedule for TEAM1, second call for TEAM2
@@ -150,7 +149,7 @@ class TestPagerDutyClient:
 
     def test_get_schedules_by_team_handles_404(self):
         """Test that 404 errors for teams are logged and skipped."""
-        client = PagerDutyClient(api_key="test_key", from_email="test@example.com")
+        client = PagerDutyClient(api_key="test_key")
 
         mock_api_client = Mock()
         # Create a mock response with status_code 404
@@ -173,7 +172,7 @@ class TestPagerDutyClient:
 
     def test_get_oncalls_success(self):
         """Test successfully fetching on-call entries."""
-        client = PagerDutyClient(api_key="test_key", from_email="test@example.com")
+        client = PagerDutyClient(api_key="test_key")
 
         mock_api_client = Mock()
         mock_api_client.iter_all.return_value = iter([
@@ -205,7 +204,7 @@ class TestPagerDutyClient:
 
     def test_get_oncalls_filters_invalid_entries(self):
         """Test that invalid on-call entries are skipped."""
-        client = PagerDutyClient(api_key="test_key", from_email="test@example.com")
+        client = PagerDutyClient(api_key="test_key")
 
         mock_api_client = Mock()
         mock_api_client.iter_all.return_value = iter([
@@ -244,7 +243,7 @@ class TestPagerDutyClient:
 
     def test_test_connection_success(self):
         """Test successful connection test."""
-        client = PagerDutyClient(api_key="test_key", from_email="test@example.com")
+        client = PagerDutyClient(api_key="test_key")
 
         mock_api_client = Mock()
         mock_response = Mock()
@@ -259,7 +258,7 @@ class TestPagerDutyClient:
 
     def test_test_connection_failure(self):
         """Test connection test with authentication failure."""
-        client = PagerDutyClient(api_key="test_key", from_email="test@example.com")
+        client = PagerDutyClient(api_key="test_key")
 
         mock_api_client = Mock()
         mock_api_client.get.side_effect = Exception("401 Unauthorized")
@@ -271,7 +270,7 @@ class TestPagerDutyClient:
     @patch("oncall_scheduler.api.client.time.sleep")
     def test_retry_with_backoff_success_after_retry(self, mock_sleep):
         """Test retry logic succeeds after initial failures."""
-        client = PagerDutyClient(api_key="test_key", from_email="test@example.com")
+        client = PagerDutyClient(api_key="test_key")
 
         mock_func = Mock(side_effect=[NetworkError("timeout"), NetworkError("timeout"), "success"])
 
@@ -284,7 +283,7 @@ class TestPagerDutyClient:
     @patch("oncall_scheduler.api.client.time.sleep")
     def test_retry_with_backoff_exhausts_retries(self, mock_sleep):
         """Test retry logic exhausts all retries and raises error."""
-        client = PagerDutyClient(api_key="test_key", from_email="test@example.com")
+        client = PagerDutyClient(api_key="test_key")
 
         mock_func = Mock(side_effect=NetworkError("timeout"))
 
@@ -296,7 +295,7 @@ class TestPagerDutyClient:
     @patch("oncall_scheduler.api.client.time.sleep")
     def test_retry_with_backoff_non_retryable_error(self, mock_sleep):
         """Test that non-retryable errors are not retried."""
-        client = PagerDutyClient(api_key="test_key", from_email="test@example.com")
+        client = PagerDutyClient(api_key="test_key")
 
         mock_func = Mock(side_effect=Exception("401 Unauthorized"))
 
