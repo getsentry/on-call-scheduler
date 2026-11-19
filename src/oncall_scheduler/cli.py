@@ -138,21 +138,30 @@ def cli():
     "-z",
     "timezones",
     multiple=True,
-    help="Only include users in specified timezones (can be specified multiple times, e.g. --timezone America/New_York --timezone Europe/London)",
+    help=(
+        "Only include users in specified timezones (can be specified multiple times, e.g. "
+        "--timezone America/New_York --timezone Europe/London)"
+    ),
 )
 @click.option(
     "--exclude-user",
     "-e",
     "excluded_users",
     multiple=True,
-    help="Exclude specific users from over-limit reporting (can be specified multiple times, e.g. --exclude-user user1@example.com --exclude-user user2@example.com)",
+    help=(
+        "Exclude specific users from over-limit reporting (can be specified multiple times, e.g. "
+        "--exclude-user user1@example.com --exclude-user user2@example.com)"
+    ),
 )
 @click.option(
     "--exclude-schedule",
     "-s",
     "excluded_schedules",
     multiple=True,
-    help="Exclude specific schedules from analysis by ID or name (can be specified multiple times, e.g. --exclude-schedule SCHEDULE1 --exclude-schedule 'Primary On-Call')",
+    help=(
+        "Exclude specific schedules from analysis by ID or name (can be specified multiple times, "
+        "e.g. --exclude-schedule SCHEDULE1 --exclude-schedule 'Primary On-Call')"
+    ),
 )
 @click.option(
     "--pto-file",
@@ -168,21 +177,30 @@ def cli():
     "holiday_file",
     type=click.Path(exists=True),
     envvar="HOLIDAY_FILE",
-    help="Path to JSON file containing holiday data to check for on-call conflicts (keyed by timezone)",
+    help=(
+        "Path to JSON file containing holiday data to check for on-call conflicts (keyed by "
+        "timezone)"
+    ),
 )
 @click.option(
     "--include-schedules-from-holidays",
     "included_schedules_for_holidays",
     multiple=True,
     envvar="INCLUDE_SCHEDULES_FROM_HOLIDAYS",
-    help="Only check specified schedules for holiday conflicts by ID or name (can be specified multiple times)",
+    help=(
+        "Only check specified schedules for holiday conflicts by ID or name (can be specified "
+        "multiple times)"
+    ),
 )
 @click.option(
     "--exclude-schedules-from-holidays",
     "excluded_schedules_for_holidays",
     multiple=True,
     envvar="EXCLUDE_SCHEDULES_FROM_HOLIDAYS",
-    help="Exclude specified schedules from holiday conflict checking by ID or name (can be specified multiple times)",
+    help=(
+        "Exclude specified schedules from holiday conflict checking by ID or name (can be "
+        "specified multiple times)"
+    ),
 )
 def check(
     teams: tuple,
@@ -327,17 +345,20 @@ def check(
         if holidays_by_timezone:
             total_holidays = sum(len(holidays) for holidays in holidays_by_timezone.values())
             click.echo(
-                f"Holidays: {len(holidays_by_timezone)} timezones, {total_holidays} holidays loaded",
+                f"Holidays: {len(holidays_by_timezone)} timezones, "
+                f"{total_holidays} holidays loaded",
                 err=True,
             )
         if included_schedules_for_holidays_list:
             click.echo(
-                f"Holiday conflict included schedules: {', '.join(included_schedules_for_holidays_list)}",
+                "Holiday conflict included schedules: "
+                f"{', '.join(included_schedules_for_holidays_list)}",
                 err=True,
             )
         if excluded_schedules_for_holidays_list:
             click.echo(
-                f"Holiday conflict excluded schedules: {', '.join(excluded_schedules_for_holidays_list)}",
+                "Holiday conflict excluded schedules: "
+                f"{', '.join(excluded_schedules_for_holidays_list)}",
                 err=True,
             )
         click.echo("", err=True)

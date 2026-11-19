@@ -2,10 +2,8 @@
 
 import json
 from datetime import date
-from io import StringIO
 from unittest.mock import patch
 
-import pytest
 from rich.table import Table
 
 from oncall_scheduler.models import AnalysisResult, OnCallReport, User

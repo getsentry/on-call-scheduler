@@ -1,9 +1,8 @@
 """Tests for the on-call schedule analyzer."""
 
 from datetime import date, datetime
-from unittest.mock import Mock, patch
+from unittest.mock import Mock
 
-import pytest
 import pytz
 
 from oncall_scheduler.analysis.analyzer import analyze_schedules
@@ -392,7 +391,7 @@ class TestAnalyzeSchedules:
         mock_client.get_oncalls.return_value = entries
 
         # Exclude schedule2 by ID
-        result = analyze_schedules(
+        analyze_schedules(
             team_ids=["TEAM1"],
             month=1,
             year=2026,
@@ -410,7 +409,6 @@ class TestAnalyzeSchedules:
 
     def test_analyze_schedules_excluded_schedules_by_name(self):
         """Test that schedules can be excluded by name."""
-        user = User(id="PUSER1", name="Test User", email="test@example.com")
         schedule1 = Schedule(id="PSCHED1", name="Primary Schedule", timezone="UTC")
         schedule2 = Schedule(id="PSCHED2", name="Secondary Schedule", timezone="UTC")
 
@@ -419,7 +417,7 @@ class TestAnalyzeSchedules:
         mock_client.get_oncalls.return_value = []
 
         # Exclude schedule1 by name
-        result = analyze_schedules(
+        analyze_schedules(
             team_ids=["TEAM1"],
             month=1,
             year=2026,

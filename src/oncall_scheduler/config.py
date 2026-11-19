@@ -56,7 +56,10 @@ class Settings(BaseSettings):
 
     user_timezones: str | None = Field(
         default=None,
-        description='JSON mapping of user emails to timezones, e.g. \'{"user@example.com": "America/New_York"}\'',
+        description=(
+            'JSON mapping of user emails to timezones, e.g. \'{"user@example.com": '
+            '"America/New_York"}\''
+        ),
         validation_alias="USER_TIMEZONES",
     )
 
@@ -68,19 +71,28 @@ class Settings(BaseSettings):
 
     timezones_of_concern: str | None = Field(
         default=None,
-        description="Comma-separated list of timezones to include in analysis (e.g. 'America/New_York,Europe/London'). If not specified, all timezones are included.",
+        description=(
+            "Comma-separated list of timezones to include in analysis (e.g. "
+            "'America/New_York,Europe/London'). If not specified, all timezones are included."
+        ),
         validation_alias="TIMEZONES_OF_CONCERN",
     )
 
     excluded_users: str | None = Field(
         default=None,
-        description="Comma-separated list of user emails to exclude from over-limit reporting (e.g. 'user1@example.com,user2@example.com').",
+        description=(
+            "Comma-separated list of user emails to exclude from over-limit reporting "
+            "(e.g. 'user1@example.com,user2@example.com')."
+        ),
         validation_alias="EXCLUDED_USERS",
     )
 
     excluded_schedules: str | None = Field(
         default=None,
-        description="Comma-separated list of schedule IDs or names to exclude from analysis (e.g. 'SCHEDULE1,SCHEDULE2' or 'Primary On-Call,Secondary').",
+        description=(
+            "Comma-separated list of schedule IDs or names to exclude from analysis (e.g. "
+            "'SCHEDULE1,SCHEDULE2' or 'Primary On-Call,Secondary')."
+        ),
         validation_alias="EXCLUDED_SCHEDULES",
     )
 
@@ -92,19 +104,28 @@ class Settings(BaseSettings):
 
     holiday_file: str | None = Field(
         default=None,
-        description="Path to JSON file containing holiday data to check for on-call conflicts (keyed by timezone).",
+        description=(
+            "Path to JSON file containing holiday data to check for on-call conflicts "
+            "(keyed by timezone)."
+        ),
         validation_alias="HOLIDAY_FILE",
     )
 
     include_schedules_for_holidays: str | None = Field(
         default=None,
-        description="Comma-separated list of schedule IDs or names to include for holiday conflict checking. If not specified, all schedules are checked.",
+        description=(
+            "Comma-separated list of schedule IDs or names to include for holiday conflict "
+            "checking. If not specified, all schedules are checked."
+        ),
         validation_alias="INCLUDE_SCHEDULES_FROM_HOLIDAYS",
     )
 
     exclude_schedules_for_holidays: str | None = Field(
         default=None,
-        description="Comma-separated list of schedule IDs or names to exclude from holiday conflict checking.",
+        description=(
+            "Comma-separated list of schedule IDs or names to exclude from holiday "
+            "conflict checking."
+        ),
         validation_alias="EXCLUDE_SCHEDULES_FROM_HOLIDAYS",
     )
 
@@ -143,7 +164,8 @@ class Settings(BaseSettings):
         """Parse and return timezones of concern as a list.
 
         Returns:
-            List of timezone strings to include in analysis. Empty list means all timezones are included.
+            List of timezone strings to include in analysis. Empty list means all timezones are
+            included.
         """
         if not self.timezones_of_concern:
             return []
@@ -153,7 +175,8 @@ class Settings(BaseSettings):
         """Parse and return excluded users as a list.
 
         Returns:
-            List of user emails to exclude from over-limit reporting. Empty list means no users are excluded.
+            List of user emails to exclude from over-limit reporting. Empty list means no users are
+            excluded.
         """
         if not self.excluded_users:
             return []
@@ -163,7 +186,8 @@ class Settings(BaseSettings):
         """Parse and return excluded schedules as a list.
 
         Returns:
-            List of schedule IDs or names to exclude from analysis. Empty list means no schedules are excluded.
+            List of schedule IDs or names to exclude from analysis. Empty list means no schedules
+            are excluded.
         """
         if not self.excluded_schedules:
             return []
@@ -173,7 +197,8 @@ class Settings(BaseSettings):
         """Parse and return schedules to include for holiday conflict checking.
 
         Returns:
-            List of schedule IDs or names to include for holiday checking. Empty list means all schedules are checked.
+            List of schedule IDs or names to include for holiday checking. Empty list means all
+            schedules are checked.
         """
         if not self.include_schedules_for_holidays:
             return []
@@ -183,7 +208,8 @@ class Settings(BaseSettings):
         """Parse and return schedules to exclude from holiday conflict checking.
 
         Returns:
-            List of schedule IDs or names to exclude from holiday checking. Empty list means no schedules are excluded.
+            List of schedule IDs or names to exclude from holiday checking. Empty list means no
+            schedules are excluded.
         """
         if not self.exclude_schedules_for_holidays:
             return []

@@ -1,11 +1,10 @@
 """Tests for PagerDuty API client."""
 
 from datetime import datetime
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import Mock, patch
 
 import pagerduty
 import pytest
-import pytz
 
 from oncall_scheduler.api.client import PagerDutyClient
 from oncall_scheduler.api.exceptions import (
@@ -15,7 +14,6 @@ from oncall_scheduler.api.exceptions import (
     RateLimitError,
     ResourceNotFoundError,
 )
-from oncall_scheduler.models import Schedule, ScheduleEntry
 
 
 class TestPagerDutyClient:
@@ -36,7 +34,8 @@ class TestPagerDutyClient:
             result = client._get_client()
 
             mock_client_class.assert_called_once_with("test_key")
-            assert client.client is not None
+            assert result is mock_client_class.return_value
+            assert client.client is result
 
     def test_get_client_reuses_client(self):
         """Test that _get_client reuses existing client."""

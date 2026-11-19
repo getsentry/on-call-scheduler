@@ -271,7 +271,6 @@ class TestLoadPtoData:
 
     def test_load_pto_data_empty_file(self, tmp_path):
         """Test loading an empty PTO data file."""
-        import json
 
         pto_file = tmp_path / "empty.json"
         pto_file.write_text("{}")

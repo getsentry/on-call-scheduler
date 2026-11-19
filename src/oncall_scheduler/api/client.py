@@ -3,7 +3,6 @@
 import logging
 import time
 from datetime import datetime
-from typing import Dict, List
 
 import pagerduty
 
@@ -94,7 +93,7 @@ class PagerDutyClient:
             except Exception as e:
                 self._handle_api_error(e)
 
-    def get_schedules_by_team(self, team_ids: List[str]) -> List[Schedule]:
+    def get_schedules_by_team(self, team_ids: list[str]) -> list[Schedule]:
         """Fetch schedules associated with specified teams.
 
         Args:
@@ -140,11 +139,11 @@ class PagerDutyClient:
 
     def get_oncalls(
         self,
-        schedule_ids: List[str],
+        schedule_ids: list[str],
         since: datetime,
         until: datetime,
-        user_timezones: Dict[str, str] = None,
-    ) -> List[ScheduleEntry]:
+        user_timezones: dict[str, str] = None,
+    ) -> list[ScheduleEntry]:
         """Fetch on-call entries for specified schedules and time range.
 
         Args:
