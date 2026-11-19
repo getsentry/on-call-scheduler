@@ -200,6 +200,42 @@ class TestCalculateOncallDays:
         assert date(2026, 1, 4) in result["PUSER1"]
         assert date(2026, 1, 5) not in result["PUSER1"]
 
+    def test_month_start_uses_user_timezone(self):
+        """Test that a Dec 31 evening in Los Angeles is not counted in January."""
+        user = User(
+            id="PUSER1", name="LA User", email="la@example.com", timezone="America/Los_Angeles"
+        )
+        schedule = Schedule(id="PSCHED1", name="Test Schedule", timezone="UTC")
+
+        # Dec 31 17:00-19:00 in Los Angeles, which is already Jan 1 in UTC
+        start = pytz.utc.localize(datetime(2026, 1, 1, 1, 0, 0))
+        end = pytz.utc.localize(datetime(2026, 1, 1, 3, 0, 0))
+        entry = ScheduleEntry(user=user, schedule=schedule, start=start, end=end)
+
+        january = calculate_oncall_days([entry], month=1, year=2026)
+        december = calculate_oncall_days([entry], month=12, year=2025)
+
+        assert january.get("PUSER1", set()) == set()
+        assert december["PUSER1"] == {date(2025, 12, 31)}
+
+    def test_month_end_uses_user_timezone(self):
+        """Test that a Feb 1 evening in Vienna is not counted in January."""
+        user = User(
+            id="PUSER1", name="Vienna User", email="vienna@example.com", timezone="Europe/Vienna"
+        )
+        schedule = Schedule(id="PSCHED1", name="Test Schedule", timezone="UTC")
+
+        # Jan 31 09:00 to Feb 2 09:00 in Vienna
+        start = pytz.utc.localize(datetime(2026, 1, 31, 8, 0, 0))
+        end = pytz.utc.localize(datetime(2026, 2, 2, 8, 0, 0))
+        entry = ScheduleEntry(user=user, schedule=schedule, start=start, end=end)
+
+        january = calculate_oncall_days([entry], month=1, year=2026)
+        february = calculate_oncall_days([entry], month=2, year=2026)
+
+        assert january["PUSER1"] == {date(2026, 1, 31)}
+        assert february["PUSER1"] == {date(2026, 2, 1)}
+
     def test_empty_entries_list(self):
         """Test with no entries."""
         result = calculate_oncall_days([], month=1, year=2026)
