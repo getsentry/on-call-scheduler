@@ -9,18 +9,24 @@ from pydantic import ValidationError
 from oncall_scheduler.config import Settings, load_pto_data, load_settings
 
 
+@pytest.fixture(autouse=True)
+def isolated_settings_env(monkeypatch, tmp_path):
+    """Keep a developer's real environment and .env file out of these tests."""
+    for name, field in Settings.model_fields.items():
+        monkeypatch.delenv(str(field.validation_alias or name).upper(), raising=False)
+        monkeypatch.delenv(name.upper(), raising=False)
+    # Settings reads ".env" relative to the working directory
+    monkeypatch.chdir(tmp_path)
+
+
 class TestSettings:
     """Tests for the Settings class."""
 
     def test_settings_with_required_fields(self):
         """Test creating Settings with only required fields."""
-        settings = Settings(
-            pagerduty_api_key="test_key",
-            pagerduty_from_email="test@example.com"
-        )
+        settings = Settings(PAGERDUTY_API_KEY="test_key")
 
         assert settings.pagerduty_api_key == "test_key"
-        assert settings.pagerduty_from_email == "test@example.com"
         assert settings.oncall_max_days == 10  # Default value
         assert settings.timezone == "UTC"  # Default value
         assert settings.sentry_dsn is None
@@ -31,26 +37,23 @@ class TestSettings:
         with pytest.raises(ValidationError) as exc_info:
             Settings()
 
-        # Should complain about missing pagerduty_api_key and pagerduty_from_email
+        # Should complain about missing pagerduty_api_key (reported by its env alias)
         errors = exc_info.value.errors()
         field_names = [error["loc"][0] for error in errors]
-        assert "pagerduty_api_key" in field_names
-        assert "pagerduty_from_email" in field_names
+        assert "PAGERDUTY_API_KEY" in field_names
 
     def test_settings_with_all_fields(self):
         """Test creating Settings with all fields specified."""
         settings = Settings(
-            pagerduty_api_key="test_key",
-            pagerduty_from_email="test@example.com",
-            pagerduty_team_ids="TEAM1,TEAM2,TEAM3",
-            oncall_max_days=15,
+            PAGERDUTY_API_KEY="test_key",
+            PAGERDUTY_TEAM_IDS="TEAM1,TEAM2,TEAM3",
+            ONCALL_MAX_DAYS=15,
             timezone="America/New_York",
-            sentry_dsn="https://test@sentry.io/123",
-            sentry_environment="staging",
+            SENTRY_DSN="https://test@sentry.io/123",
+            SENTRY_ENVIRONMENT="staging",
         )
 
         assert settings.pagerduty_api_key == "test_key"
-        assert settings.pagerduty_from_email == "test@example.com"
         assert settings.pagerduty_team_ids == "TEAM1,TEAM2,TEAM3"
         assert settings.oncall_max_days == 15
         assert settings.timezone == "America/New_York"
@@ -60,19 +63,15 @@ class TestSettings:
     def test_settings_custom_max_days(self):
         """Test setting custom max_days value."""
         settings = Settings(
-            pagerduty_api_key="test_key",
-            pagerduty_from_email="test@example.com",
-            oncall_max_days=20,
+            PAGERDUTY_API_KEY="test_key",
+            ONCALL_MAX_DAYS=20,
         )
 
         assert settings.oncall_max_days == 20
 
     def test_get_team_ids_empty(self):
         """Test get_team_ids with no team IDs configured."""
-        settings = Settings(
-            pagerduty_api_key="test_key",
-            pagerduty_from_email="test@example.com"
-        )
+        settings = Settings(PAGERDUTY_API_KEY="test_key")
 
         team_ids = settings.get_team_ids()
 
@@ -81,9 +80,8 @@ class TestSettings:
     def test_get_team_ids_single(self):
         """Test get_team_ids with a single team ID."""
         settings = Settings(
-            pagerduty_api_key="test_key",
-            pagerduty_from_email="test@example.com",
-            pagerduty_team_ids="TEAM1",
+            PAGERDUTY_API_KEY="test_key",
+            PAGERDUTY_TEAM_IDS="TEAM1",
         )
 
         team_ids = settings.get_team_ids()
@@ -93,9 +91,8 @@ class TestSettings:
     def test_get_team_ids_multiple(self):
         """Test get_team_ids with multiple team IDs."""
         settings = Settings(
-            pagerduty_api_key="test_key",
-            pagerduty_from_email="test@example.com",
-            pagerduty_team_ids="TEAM1,TEAM2,TEAM3",
+            PAGERDUTY_API_KEY="test_key",
+            PAGERDUTY_TEAM_IDS="TEAM1,TEAM2,TEAM3",
         )
 
         team_ids = settings.get_team_ids()
@@ -105,9 +102,8 @@ class TestSettings:
     def test_get_team_ids_with_spaces(self):
         """Test get_team_ids strips whitespace from team IDs."""
         settings = Settings(
-            pagerduty_api_key="test_key",
-            pagerduty_from_email="test@example.com",
-            pagerduty_team_ids="TEAM1 , TEAM2 ,  TEAM3",
+            PAGERDUTY_API_KEY="test_key",
+            PAGERDUTY_TEAM_IDS="TEAM1 , TEAM2 ,  TEAM3",
         )
 
         team_ids = settings.get_team_ids()
@@ -116,7 +112,6 @@ class TestSettings:
 
     @patch.dict(os.environ, {
         "PAGERDUTY_API_KEY": "env_key",
-        "PAGERDUTY_FROM_EMAIL": "env@example.com",
         "ONCALL_MAX_DAYS": "25",
         "PAGERDUTY_TEAM_IDS": "TEAM_ENV1,TEAM_ENV2",
     }, clear=True)
@@ -125,13 +120,11 @@ class TestSettings:
         settings = Settings()
 
         assert settings.pagerduty_api_key == "env_key"
-        assert settings.pagerduty_from_email == "env@example.com"
         assert settings.oncall_max_days == 25
         assert settings.get_team_ids() == ["TEAM_ENV1", "TEAM_ENV2"]
 
     @patch.dict(os.environ, {
         "PAGERDUTY_API_KEY": "env_key",
-        "PAGERDUTY_FROM_EMAIL": "env@example.com",
         "SENTRY_DSN": "https://sentry@example.com/123",
         "SENTRY_ENVIRONMENT": "development",
     }, clear=True)
@@ -144,7 +137,6 @@ class TestSettings:
 
     @patch.dict(os.environ, {
         "PAGERDUTY_API_KEY": "env_key",
-        "PAGERDUTY_FROM_EMAIL": "env@example.com",
     }, clear=True)
     def test_settings_case_insensitive(self):
         """Test that settings are case insensitive."""
@@ -161,7 +153,6 @@ class TestLoadSettings:
 
     @patch.dict(os.environ, {
         "PAGERDUTY_API_KEY": "test_key",
-        "PAGERDUTY_FROM_EMAIL": "test@example.com",
     }, clear=True)
     def test_load_settings(self):
         """Test load_settings function."""
@@ -169,7 +160,6 @@ class TestLoadSettings:
 
         assert isinstance(settings, Settings)
         assert settings.pagerduty_api_key == "test_key"
-        assert settings.pagerduty_from_email == "test@example.com"
 
     @patch.dict(os.environ, {}, clear=True)
     def test_load_settings_missing_required(self):
@@ -179,10 +169,7 @@ class TestLoadSettings:
 
     def test_get_excluded_schedules_empty(self):
         """Test get_excluded_schedules with no schedules excluded."""
-        settings = Settings(
-            pagerduty_api_key="test_key",
-            pagerduty_from_email="test@example.com"
-        )
+        settings = Settings(PAGERDUTY_API_KEY="test_key")
 
         excluded_schedules = settings.get_excluded_schedules()
 
@@ -191,9 +178,8 @@ class TestLoadSettings:
     def test_get_excluded_schedules_single(self):
         """Test get_excluded_schedules with a single schedule."""
         settings = Settings(
-            pagerduty_api_key="test_key",
-            pagerduty_from_email="test@example.com",
-            excluded_schedules="SCHEDULE1",
+            PAGERDUTY_API_KEY="test_key",
+            EXCLUDED_SCHEDULES="SCHEDULE1",
         )
 
         excluded_schedules = settings.get_excluded_schedules()
@@ -203,9 +189,8 @@ class TestLoadSettings:
     def test_get_excluded_schedules_multiple(self):
         """Test get_excluded_schedules with multiple schedules."""
         settings = Settings(
-            pagerduty_api_key="test_key",
-            pagerduty_from_email="test@example.com",
-            excluded_schedules="SCHEDULE1,SCHEDULE2,Primary On-Call",
+            PAGERDUTY_API_KEY="test_key",
+            EXCLUDED_SCHEDULES="SCHEDULE1,SCHEDULE2,Primary On-Call",
         )
 
         excluded_schedules = settings.get_excluded_schedules()
@@ -215,9 +200,8 @@ class TestLoadSettings:
     def test_get_excluded_schedules_with_spaces(self):
         """Test get_excluded_schedules strips whitespace from schedule identifiers."""
         settings = Settings(
-            pagerduty_api_key="test_key",
-            pagerduty_from_email="test@example.com",
-            excluded_schedules="SCHEDULE1 , SCHEDULE2 ,  Primary On-Call",
+            PAGERDUTY_API_KEY="test_key",
+            EXCLUDED_SCHEDULES="SCHEDULE1 , SCHEDULE2 ,  Primary On-Call",
         )
 
         excluded_schedules = settings.get_excluded_schedules()
