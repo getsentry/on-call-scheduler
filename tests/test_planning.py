@@ -114,7 +114,8 @@ class TestRollingCap:
         # A did the last published week, so A's next shift must be at least 4 weeks after it.
         p = write(
             tmp_path,
-            SMALL + """
+            SMALL
+            + """
             [[published]]
             week = 2026-12-29
             primary = "A"

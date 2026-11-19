@@ -157,7 +157,7 @@ def load_config(
         if "roles" in p:
             bad = set(p["roles"]) - set(roles)
             if bad:
-                raise ConfigError(f'{p["name"]}: unknown role(s) {sorted(bad)}; roles are {roles}')
+                raise ConfigError(f"{p['name']}: unknown role(s) {sorted(bad)}; roles are {roles}")
             allowed[p["name"]] = set(p["roles"])
     for name in remove:
         if name not in people:
