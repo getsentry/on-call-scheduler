@@ -1,0 +1,83 @@
+# Two roles, three offices, one office with a legal cap on on-call days.
+# Run:  uv run oncall-scheduler plan examples/plan/three-offices.toml
+#
+# Compare the handoff times:
+#   uv run oncall-scheduler plan examples/plan/three-offices.toml --handoff-time 10:00
+
+[team]
+name = "Example: three offices"
+
+[offices.Vienna]
+timezone = "Europe/Vienna"
+max_oncall_days = 10       # at most 10 after-hours on-call days...
+per = "month"              # ...per calendar month, counted like `oncall-scheduler check`
+                           # (or e.g. per = 28: any rolling 28 days, every shift day counts)
+
+[offices."San Francisco"]
+timezone = "America/Los_Angeles"
+
+[offices.Toronto]
+timezone = "America/Toronto"
+
+[[people]]
+name = "Ana"
+office = "Vienna"
+
+[[people]]
+name = "Ben"
+office = "Vienna"
+
+[[people]]
+name = "Cleo"
+office = "San Francisco"
+
+[[people]]
+name = "Dev"
+office = "San Francisco"
+
+[[people]]
+name = "Eli"
+office = "Toronto"
+
+[[people]]
+name = "Fay"
+office = "Toronto"
+
+[[people]]
+name = "Gus"
+office = "Toronto"
+
+[[people]]
+name = "Hana"
+office = "Toronto"
+
+[rotation]
+start = 2027-01-19
+roles = ["Primary", "Secondary"]
+handoff_time = "08:00"     # the weekday comes from `start`
+handoff_timezone = "America/Los_Angeles"
+workday_end_hour = 17      # same meaning as WORKDAY_END_HOUR for `check`
+handovers = "avoid"        # or "maximize": Secondary one week, Primary the next
+single_order = true        # Secondary reuses the Primary order, shifted
+
+# The weeks already published before `start`. Rules are enforced across the
+# switch-over. People no longer on the rotation (Old Member) are fine here.
+[[published]]
+week = 2026-12-22
+primary = "Eli"
+secondary = "Old Member"
+
+[[published]]
+week = 2026-12-29
+primary = "Ana"
+secondary = "Cleo"
+
+[[published]]
+week = 2027-01-05
+primary = "Hana"
+secondary = "Dev"
+
+[[published]]
+week = 2027-01-12
+primary = "Gus"
+secondary = "Ben"

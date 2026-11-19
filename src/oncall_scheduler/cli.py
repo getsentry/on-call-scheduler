@@ -418,6 +418,78 @@ def check(
 
 
 @cli.command()
+@click.argument("team_file", type=click.Path(exists=True, dir_okay=False))
+@click.option(
+    "--handovers",
+    type=click.Choice(["avoid", "maximize"]),
+    help="Avoid back-to-back weeks, or maximise moving up a role the next week",
+)
+@click.option("--start", type=click.DateTime(formats=["%Y-%m-%d"]), help="First week (YYYY-MM-DD)")
+@click.option("--handoff-time", help="Handoff time (HH:MM) in the team file's handoff_timezone")
+@click.option("--cycle-weeks", type=int, help="Length of the repeating cycle")
+@click.option("--load", type=click.Choice(["equal", "balanced"]))
+@click.option("--add", "add", multiple=True, metavar="NAME=OFFICE", help="Add a person")
+@click.option("--remove", multiple=True, metavar="NAME", help="Remove a person")
+@click.option("--two-orders", is_flag=True, help="Don't require roles to share one shifted order")
+@click.option("--no-published", is_flag=True, help="Ignore the published weeks in the team file")
+@click.option("--csv", "csv_path", type=click.Path(dir_okay=False), help="Also write CSV")
+@click.option("--md", "md_path", type=click.Path(dir_okay=False), help="Also write Markdown")
+@click.option("--weeks", default=52, show_default=True, help="Weeks to write to --csv")
+def plan(
+    team_file,
+    handovers,
+    start,
+    handoff_time,
+    cycle_weeks,
+    load,
+    add,
+    remove,
+    two_orders,
+    no_published,
+    csv_path,
+    md_path,
+    weeks,
+):
+    """Plan a weekly on-call rotation that meets the rules in TEAM_FILE.
+
+    See examples/plan/ for team files. Calendar-month legal caps are counted the same
+    way as `check` counts on-call days.
+    """
+    from oncall_scheduler.planning import ConfigError, PlanError, load_config
+    from oncall_scheduler.planning import plan as make_plan
+    from oncall_scheduler.planning.report import markdown, write_csv
+
+    try:
+        cfg = load_config(
+            team_file,
+            add=add,
+            remove=remove,
+            start=start.date() if start else None,
+            cycle_weeks=cycle_weeks,
+            handovers=handovers,
+            load=load,
+            handoff_time=handoff_time,
+            two_orders=two_orders,
+            no_published=no_published,
+        )
+    except ConfigError as e:
+        raise click.ClickException(f"{team_file}: {e}") from e
+    try:
+        result = make_plan(cfg)
+    except PlanError as e:
+        for m in e.messages:
+            click.echo(f"- {m}", err=True)
+        sys.exit(1)
+    text = markdown(result)
+    click.echo(text, nl=False)
+    if md_path:
+        with open(md_path, "w") as f:
+            f.write(text)
+    if csv_path:
+        write_csv(result, csv_path, weeks)
+
+
+@cli.command()
 def version():
     """Show the application version."""
     click.echo(f"oncall-scheduler version {__version__}")
