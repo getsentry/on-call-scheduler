@@ -53,7 +53,8 @@ class Plan:
 # --------------------------------------------------------------------------- #
 @cache
 def _counted(start, end, tz, workday_end_hour):
-    return frozenset(get_dates_in_range(start, end, start, end, tz, workday_end_hour))
+    # One whole shift, no month clamp: monthly caps are applied by the callers
+    return frozenset(get_dates_in_range(start, end, None, None, tz, workday_end_hour))
 
 
 def counted_dates(cfg: Config, k: int, tz: str) -> frozenset[dt.date]:

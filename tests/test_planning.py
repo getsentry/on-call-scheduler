@@ -81,6 +81,12 @@ class TestMonthlyCap:
         assert days_per_shift(load_config(THREE, handoff_time="10:00"), "Europe/Vienna") == 8
         assert days_per_shift(load_config(THREE, handoff_time="08:00"), "Europe/Vienna") == 7
 
+    def test_handoff_after_midnight_counts_the_first_evening_in_the_west(self, tmp_path):
+        # 01:00 Toronto is 22:00 the previous evening in Los Angeles, so the shift covers
+        # 8 Los Angeles evenings: the first evening is the day before the Toronto handoff date
+        cfg = load_config(write(tmp_path, SMALL), handoff_time="01:00")
+        assert days_per_shift(cfg, "America/Los_Angeles") == 8
+
     def test_late_handoff_rules_out_equal_load_and_says_why(self):
         with pytest.raises(PlanError) as e:
             plan(load_config(THREE, handoff_time="10:00"))
