@@ -12,6 +12,7 @@ A Python CLI tool for analyzing PagerDuty on-call schedules and identifying team
 - Beautiful color-coded terminal output using Rich
 - JSON output support for automation and scripting
 - Configurable via environment variables or CLI arguments
+- **Rotation planning (`plan`, experimental)** - generate a weekly rotation that stays within the same day limit, with time-zone and fairness goals (see [Planning a Rotation](#planning-a-rotation-experimental))
 
 ## Installation
 
@@ -199,6 +200,77 @@ uv run oncall-scheduler check --team PXXXXXX --output json | jq '.over_limit[].u
 uv run oncall-scheduler check --team PXXXXXX --output json | jq '.over_limit | length'
 ```
 
+## Planning a Rotation (experimental)
+
+`check` finds problems in schedules you already have. `plan` designs a new weekly rotation that avoids them. You describe the team in a TOML file, and it returns:
+
+- a rotation that meets every hard rule
+- each goal's result, with proof that it is the best possible
+- the order to enter for each PagerDuty layer
+
+It uses the [OR-Tools](https://developers.google.com/optimization) CP-SAT solver and needs no PagerDuty API key.
+
+```bash
+uv run oncall-scheduler plan examples/plan/three-offices.toml
+uv run oncall-scheduler plan examples/plan/three-offices.toml --handoff-time 10:00   # compare handoffs
+uv run oncall-scheduler plan team.toml --add "Sam=San Francisco"                     # what if Sam joins?
+uv run oncall-scheduler plan team.toml --remove Ana --load balanced --cycle-weeks 16  # ...or Ana leaves?
+uv run oncall-scheduler plan team.toml --csv next-year.csv --md report.md
+```
+
+### Day limits, counted the same way as `check`
+
+A legal cap is set per office. With `per = "month"`, the planner counts days with the same function `check` uses (`get_dates_in_range`). A day counts when on-call coverage runs past `workday_end_hour` in the person's local time. The cap then applies to every calendar month for the next `check_years` years.
+
+That makes the **handoff time** important. A weekly handoff at Tuesday 10:00 in Los Angeles is 19:00 in Vienna, after a 17:00 workday end. Both handoff days then count, so each shift costs 8 days instead of 7. Two shifts 4 weeks apart can then reach 11 days in a 31-day month. With an 08:00 Los Angeles handoff (17:00 in Vienna), each shift counts 7 days and the same rotation stays within 10.
+
+With the example team:
+
+- **Handoff at 10:00:** `plan` reports that equal load is impossible and explains why.
+- **Handoff at 08:00:** it produces the rotation.
+
+```toml
+[offices.Vienna]
+timezone = "Europe/Vienna"
+max_oncall_days = 10
+per = "month"            # or a rolling window in days, e.g. per = 28 (every shift day counts)
+
+[rotation]
+start = 2027-01-19       # the handoff weekday comes from this date
+handoff_time = "08:00"
+handoff_timezone = "America/Los_Angeles"
+workday_end_hour = 17    # same meaning as WORKDAY_END_HOUR
+```
+
+### Team file
+
+See [`examples/plan/`](examples/plan) for complete files:
+
+| File | Shows |
+| --- | --- |
+| `three-offices.toml` | Primary and Secondary across 3 offices, a monthly cap, and a switch-over from published weeks |
+| `primary-only.toml` | One role, with a minimum number of weeks off |
+| `custom-rules.toml`, `custom_rules.py` | Role restrictions, people who shouldn't be on call together, and extra rules in Python |
+
+`[rotation]` options:
+
+| Key | Default | Meaning |
+| --- | --- | --- |
+| `roles` | `["Primary", "Secondary"]` | One layer per role, highest first |
+| `cycle_weeks` | team size | Length of the repeating cycle |
+| `handovers` | `"avoid"` | `"avoid"` back-to-back weeks, or `"maximize"` someone moving up a role the next week |
+| `single_order` | `true` | With `"avoid"`, every role reuses the first role's order, shifted, so there is one list to maintain |
+| `load` | `"equal"` | `"equal"` on-call weeks for everyone, or `"balanced"`: capped people do what the cap allows, and everyone else is within one week of each other |
+| `max_weeks_in_a_row`, `min_weeks_off` | `2`, `0` | Hard limits |
+| `never_together` | `[]` | Pairs of people never on call in the same week |
+| `priorities` | all goals | Order of the goals: `timezones`, `handovers`, `office_spread`, `rest`, `cutover`, `custom` |
+| `rules_file` | none | A Python file with `apply(rules)` for extra hard rules or goals |
+| `check_years` | `5` | How many years of calendar months the monthly cap is checked for |
+
+People can be limited to some roles (`roles = ["Secondary"]` on a `[[people]]` entry). `[[published]]` entries list the weeks already published up to the start date, so the caps are enforced across the switch-over.
+
+Goals are optimised one at a time, in priority order. When no rotation meets the hard rules, `plan` names the rule that blocks it, and for monthly caps explains how the handoff time affects the day count.
+
 ## Output Examples
 
 ### Table Output (Default)
@@ -294,8 +366,14 @@ src/
     ├── analysis/
     │   ├── analyzer.py     # Main analysis orchestrator
     │   └── calculator.py   # On-call days calculator
-    └── output/
-        └── formatter.py    # Output formatting
+    ├── output/
+    │   └── formatter.py    # Output formatting
+    └── planning/           # `plan`: rotation planner (OR-Tools CP-SAT)
+        ├── config.py       # Team file (TOML) loading
+        ├── model.py        # CP-SAT model
+        ├── planner.py      # Constraints, goals, diagnosis
+        ├── report.py       # Markdown / CSV output
+        └── verify.py       # Independent re-checks of the result
 ```
 
 ### Running Tests

@@ -1,0 +1,46 @@
+# Role restrictions, people who shouldn't be on call together, and a Python rules file.
+# Run:  uv run oncall-scheduler plan examples/plan/custom-rules.toml
+
+[team]
+name = "Example: custom rules"
+
+[offices.Berlin]
+timezone = "Europe/Berlin"
+
+[offices.Seattle]
+timezone = "America/Los_Angeles"
+
+[[people]]
+name = "Nia"
+office = "Berlin"
+
+[[people]]
+name = "Oto"
+office = "Berlin"
+
+[[people]]
+name = "Pam"
+office = "Berlin"
+
+[[people]]
+name = "Quin"
+office = "Seattle"
+
+[[people]]
+name = "Rae"
+office = "Seattle"
+
+[[people]]
+name = "Sol"
+office = "Seattle"
+roles = ["Secondary"]      # new hire: Secondary only for now
+
+[rotation]
+start = 2027-03-02
+handoff_time = "10:00"
+handoff_timezone = "Europe/Berlin"
+roles = ["Primary", "Secondary"]
+cycle_weeks = 9                      # 3 shifts each, so Primary/Secondary can split 2/1 around the Secondary-only new hire
+never_together = [["Nia", "Quin"]]   # e.g. the two people who own the same system
+rules_file = "custom_rules.py"       # extra rules in Python, see that file
+priorities = ["timezones", "custom", "handovers", "office_spread", "rest"]

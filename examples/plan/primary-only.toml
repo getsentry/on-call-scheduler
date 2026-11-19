@@ -1,0 +1,38 @@
+# One role, two offices, at least 3 weeks off between shifts.
+# Run:  uv run oncall-scheduler plan examples/plan/primary-only.toml
+
+[team]
+name = "Example: primary only"
+
+[offices.London]
+timezone = "Europe/London"
+
+[offices."New York"]
+timezone = "America/New_York"
+
+[[people]]
+name = "Iris"
+office = "London"
+
+[[people]]
+name = "Jon"
+office = "London"
+
+[[people]]
+name = "Kai"
+office = "New York"
+
+[[people]]
+name = "Lea"
+office = "New York"
+
+[[people]]
+name = "Max"
+office = "New York"
+
+[rotation]
+start = 2027-02-01
+roles = ["On call"]
+handoff_time = "09:00"
+handoff_timezone = "Europe/London"
+min_weeks_off = 3
