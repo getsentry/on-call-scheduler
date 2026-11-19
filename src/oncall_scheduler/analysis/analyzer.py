@@ -214,11 +214,17 @@ def analyze_schedules(
         logger.info(f"Checking PTO for {len(pto_by_email)} users ({total_pto_periods} periods)")
     if holidays_by_timezone:
         total_holidays = sum(len(holidays) for holidays in holidays_by_timezone.values())
-        logger.info(f"Checking holidays for {len(holidays_by_timezone)} timezones ({total_holidays} holidays)")
+        logger.info(
+            f"Checking holidays for {len(holidays_by_timezone)} timezones ({total_holidays} holidays)"
+        )
     if included_schedules_for_holidays:
-        logger.info(f"Holiday conflict schedules limited to: {', '.join(included_schedules_for_holidays)}")
+        logger.info(
+            f"Holiday conflict schedules limited to: {', '.join(included_schedules_for_holidays)}"
+        )
     if excluded_schedules_for_holidays:
-        logger.info(f"Holiday conflict schedules excluded: {', '.join(excluded_schedules_for_holidays)}")
+        logger.info(
+            f"Holiday conflict schedules excluded: {', '.join(excluded_schedules_for_holidays)}"
+        )
 
     # Step 1: Fetch schedules for the specified teams
     all_schedules = client.get_schedules_by_team(team_ids)
@@ -317,7 +323,9 @@ def analyze_schedules(
 
         # Filter by timezone if timezones_of_concern is specified
         if timezones_of_concern and user.timezone not in timezones_of_concern:
-            logger.debug(f"FILTERED: {user.name} - timezone {user.timezone} not in timezones of concern")
+            logger.debug(
+                f"FILTERED: {user.name} - timezone {user.timezone} not in timezones of concern"
+            )
             continue
 
         # Filter by excluded users if specified

@@ -72,7 +72,9 @@ def get_dates_in_range(
     while current_date <= end_date:
         # Create datetime for workday end on this date in user's timezone
         workday_end = tz.localize(
-            datetime(current_date.year, current_date.month, current_date.day, workday_end_hour, 0, 0)
+            datetime(
+                current_date.year, current_date.month, current_date.day, workday_end_hour, 0, 0
+            )
         )
 
         # Check if on-call coverage extends past workday end on this date
@@ -81,13 +83,21 @@ def get_dates_in_range(
         # 2. The shift is active at or after workday end on this date
         shift_active_on_date = (
             start <= workday_end < end  # Shift covers the workday end time
-            or (start.date() == current_date and start.hour >= workday_end_hour)  # Shift starts after workday end
-            or (end.date() == current_date and end.hour > workday_end_hour)  # Shift ends after workday end
+            or (
+                start.date() == current_date and start.hour >= workday_end_hour
+            )  # Shift starts after workday end
+            or (
+                end.date() == current_date and end.hour > workday_end_hour
+            )  # Shift ends after workday end
         )
 
         # More precise check: does the shift extend past workday_end_hour on this specific date?
-        day_start = tz.localize(datetime(current_date.year, current_date.month, current_date.day, 0, 0, 0))
-        day_end = tz.localize(datetime(current_date.year, current_date.month, current_date.day, 23, 59, 59))
+        day_start = tz.localize(
+            datetime(current_date.year, current_date.month, current_date.day, 0, 0, 0)
+        )
+        day_end = tz.localize(
+            datetime(current_date.year, current_date.month, current_date.day, 23, 59, 59)
+        )
 
         # Intersection of shift with this day
         shift_start_on_day = max(start, day_start)

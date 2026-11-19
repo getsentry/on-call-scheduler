@@ -228,8 +228,7 @@ def check(
 
     if not team_list:
         click.echo(
-            "Error: No team IDs specified. "
-            "Use --team option or set PAGERDUTY_TEAM_IDS in .env",
+            "Error: No team IDs specified. Use --team option or set PAGERDUTY_TEAM_IDS in .env",
             err=True,
         )
         sys.exit(1)
@@ -238,19 +237,33 @@ def check(
     max_days_limit = max_days if max_days is not None else settings.oncall_max_days
 
     # Determine timezones of concern (CLI args take precedence over config)
-    timezones_of_concern_list: list[str] = list(timezones) if timezones else settings.get_timezones_of_concern()
+    timezones_of_concern_list: list[str] = (
+        list(timezones) if timezones else settings.get_timezones_of_concern()
+    )
 
     # Determine excluded users (CLI args take precedence over config)
-    excluded_users_list: list[str] = list(excluded_users) if excluded_users else settings.get_excluded_users()
+    excluded_users_list: list[str] = (
+        list(excluded_users) if excluded_users else settings.get_excluded_users()
+    )
 
     # Determine excluded schedules (CLI args take precedence over config)
-    excluded_schedules_list: list[str] = list(excluded_schedules) if excluded_schedules else settings.get_excluded_schedules()
+    excluded_schedules_list: list[str] = (
+        list(excluded_schedules) if excluded_schedules else settings.get_excluded_schedules()
+    )
 
     # Determine included schedules for holidays (CLI args take precedence over config)
-    included_schedules_for_holidays_list: list[str] = _split_click_multiple(included_schedules_for_holidays) if included_schedules_for_holidays else settings.get_included_schedules_for_holidays()
+    included_schedules_for_holidays_list: list[str] = (
+        _split_click_multiple(included_schedules_for_holidays)
+        if included_schedules_for_holidays
+        else settings.get_included_schedules_for_holidays()
+    )
 
     # Determine excluded schedules for holidays (CLI args take precedence over config)
-    excluded_schedules_for_holidays_list: list[str] = _split_click_multiple(excluded_schedules_for_holidays) if excluded_schedules_for_holidays else settings.get_excluded_schedules_for_holidays()
+    excluded_schedules_for_holidays_list: list[str] = (
+        _split_click_multiple(excluded_schedules_for_holidays)
+        if excluded_schedules_for_holidays
+        else settings.get_excluded_schedules_for_holidays()
+    )
 
     # Determine PTO file (CLI arg takes precedence over config)
     pto_file_path = pto_file if pto_file else settings.pto_file
@@ -313,11 +326,20 @@ def check(
             click.echo(f"PTO: {len(pto_by_email)} users, {total_periods} periods loaded", err=True)
         if holidays_by_timezone:
             total_holidays = sum(len(holidays) for holidays in holidays_by_timezone.values())
-            click.echo(f"Holidays: {len(holidays_by_timezone)} timezones, {total_holidays} holidays loaded", err=True)
+            click.echo(
+                f"Holidays: {len(holidays_by_timezone)} timezones, {total_holidays} holidays loaded",
+                err=True,
+            )
         if included_schedules_for_holidays_list:
-            click.echo(f"Holiday conflict included schedules: {', '.join(included_schedules_for_holidays_list)}", err=True)
+            click.echo(
+                f"Holiday conflict included schedules: {', '.join(included_schedules_for_holidays_list)}",
+                err=True,
+            )
         if excluded_schedules_for_holidays_list:
-            click.echo(f"Holiday conflict excluded schedules: {', '.join(excluded_schedules_for_holidays_list)}", err=True)
+            click.echo(
+                f"Holiday conflict excluded schedules: {', '.join(excluded_schedules_for_holidays_list)}",
+                err=True,
+            )
         click.echo("", err=True)
 
     try:

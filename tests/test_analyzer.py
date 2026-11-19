@@ -474,7 +474,9 @@ class TestAnalyzeSchedules:
         # PTO for days 5-7 (should conflict with on-call)
         pto_by_email = {
             "test@example.com": [
-                PTOEntry(user_email="test@example.com", start=date(2026, 1, 5), end=date(2026, 1, 7))
+                PTOEntry(
+                    user_email="test@example.com", start=date(2026, 1, 5), end=date(2026, 1, 7)
+                )
             ]
         }
 
@@ -516,7 +518,9 @@ class TestAnalyzeSchedules:
         # PTO for days 10-15 (no overlap with on-call days 1-5)
         pto_by_email = {
             "test@example.com": [
-                PTOEntry(user_email="test@example.com", start=date(2026, 1, 10), end=date(2026, 1, 15))
+                PTOEntry(
+                    user_email="test@example.com", start=date(2026, 1, 10), end=date(2026, 1, 15)
+                )
             ]
         }
 
@@ -553,7 +557,9 @@ class TestAnalyzeSchedules:
         # PTO for a different user
         pto_by_email = {
             "other@example.com": [
-                PTOEntry(user_email="other@example.com", start=date(2026, 1, 1), end=date(2026, 1, 5))
+                PTOEntry(
+                    user_email="other@example.com", start=date(2026, 1, 1), end=date(2026, 1, 5)
+                )
             ]
         }
 
@@ -592,10 +598,14 @@ class TestAnalyzeSchedules:
         # Both users have PTO that conflicts with on-call
         pto_by_email = {
             "user1@example.com": [
-                PTOEntry(user_email="user1@example.com", start=date(2026, 1, 5), end=date(2026, 1, 7))
+                PTOEntry(
+                    user_email="user1@example.com", start=date(2026, 1, 5), end=date(2026, 1, 7)
+                )
             ],
             "user2@example.com": [
-                PTOEntry(user_email="user2@example.com", start=date(2026, 1, 5), end=date(2026, 1, 7))
+                PTOEntry(
+                    user_email="user2@example.com", start=date(2026, 1, 5), end=date(2026, 1, 7)
+                )
             ],
         }
 
@@ -622,8 +632,12 @@ class TestAnalyzeSchedules:
         """Test that timezone-filtered users don't appear in PTO conflicts."""
         from datetime import date
 
-        user1 = User(id="PUSER1", name="User One", email="user1@example.com", timezone="America/Los_Angeles")
-        user2 = User(id="PUSER2", name="User Two", email="user2@example.com", timezone="Europe/Vienna")
+        user1 = User(
+            id="PUSER1", name="User One", email="user1@example.com", timezone="America/Los_Angeles"
+        )
+        user2 = User(
+            id="PUSER2", name="User Two", email="user2@example.com", timezone="Europe/Vienna"
+        )
         schedule = Schedule(id="PSCHED1", name="Test Schedule", timezone="UTC")
 
         entries = []
@@ -637,10 +651,14 @@ class TestAnalyzeSchedules:
         # Both users have PTO that conflicts with on-call
         pto_by_email = {
             "user1@example.com": [
-                PTOEntry(user_email="user1@example.com", start=date(2026, 1, 5), end=date(2026, 1, 7))
+                PTOEntry(
+                    user_email="user1@example.com", start=date(2026, 1, 5), end=date(2026, 1, 7)
+                )
             ],
             "user2@example.com": [
-                PTOEntry(user_email="user2@example.com", start=date(2026, 1, 5), end=date(2026, 1, 7))
+                PTOEntry(
+                    user_email="user2@example.com", start=date(2026, 1, 5), end=date(2026, 1, 7)
+                )
             ],
         }
 
@@ -687,7 +705,9 @@ class TestAnalyzeSchedules:
         # PTO covers days 3-10 (overlaps both schedules)
         pto_by_email = {
             "test@example.com": [
-                PTOEntry(user_email="test@example.com", start=date(2026, 1, 3), end=date(2026, 1, 10))
+                PTOEntry(
+                    user_email="test@example.com", start=date(2026, 1, 3), end=date(2026, 1, 10)
+                )
             ]
         }
 

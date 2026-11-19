@@ -107,20 +107,22 @@ class TestPagerDutyClient:
         client = PagerDutyClient(api_key="test_key")
 
         mock_api_client = Mock()
-        mock_api_client.iter_all.return_value = iter([
-            {
-                "id": "PSCHED1",
-                "name": "Primary On-Call",
-                "time_zone": "America/New_York",
-                "html_url": "https://example.pagerduty.com/schedules/PSCHED1",
-            },
-            {
-                "id": "PSCHED2",
-                "name": "Secondary On-Call",
-                "time_zone": "UTC",
-                "html_url": "https://example.pagerduty.com/schedules/PSCHED2",
-            },
-        ])
+        mock_api_client.iter_all.return_value = iter(
+            [
+                {
+                    "id": "PSCHED1",
+                    "name": "Primary On-Call",
+                    "time_zone": "America/New_York",
+                    "html_url": "https://example.pagerduty.com/schedules/PSCHED1",
+                },
+                {
+                    "id": "PSCHED2",
+                    "name": "Secondary On-Call",
+                    "time_zone": "UTC",
+                    "html_url": "https://example.pagerduty.com/schedules/PSCHED2",
+                },
+            ]
+        )
 
         with patch.object(client, "_get_client", return_value=mock_api_client):
             schedules = client.get_schedules_by_team(["TEAM1"])
@@ -175,22 +177,24 @@ class TestPagerDutyClient:
         client = PagerDutyClient(api_key="test_key")
 
         mock_api_client = Mock()
-        mock_api_client.iter_all.return_value = iter([
-            {
-                "user": {
-                    "id": "PUSER1",
-                    "name": "John Doe",
-                    "email": "john@example.com",
-                },
-                "schedule": {
-                    "id": "PSCHED1",
-                    "name": "Primary On-Call",
-                    "time_zone": "UTC",
-                },
-                "start": "2026-01-01T00:00:00Z",
-                "end": "2026-01-08T00:00:00Z",
-            }
-        ])
+        mock_api_client.iter_all.return_value = iter(
+            [
+                {
+                    "user": {
+                        "id": "PUSER1",
+                        "name": "John Doe",
+                        "email": "john@example.com",
+                    },
+                    "schedule": {
+                        "id": "PSCHED1",
+                        "name": "Primary On-Call",
+                        "time_zone": "UTC",
+                    },
+                    "start": "2026-01-01T00:00:00Z",
+                    "end": "2026-01-08T00:00:00Z",
+                }
+            ]
+        )
 
         since = datetime(2026, 1, 1, 0, 0, 0)
         until = datetime(2026, 1, 31, 23, 59, 59)
@@ -207,28 +211,30 @@ class TestPagerDutyClient:
         client = PagerDutyClient(api_key="test_key")
 
         mock_api_client = Mock()
-        mock_api_client.iter_all.return_value = iter([
-            # Valid entry
-            {
-                "user": {"id": "PUSER1", "name": "John Doe", "email": "john@example.com"},
-                "schedule": {"id": "PSCHED1", "name": "Primary", "time_zone": "UTC"},
-                "start": "2026-01-01T00:00:00Z",
-                "end": "2026-01-08T00:00:00Z",
-            },
-            # Invalid entry (missing user)
-            {
-                "schedule": {"id": "PSCHED1", "name": "Primary", "time_zone": "UTC"},
-                "start": "2026-01-01T00:00:00Z",
-                "end": "2026-01-08T00:00:00Z",
-            },
-            # Another valid entry
-            {
-                "user": {"id": "PUSER2", "name": "Jane Doe", "email": "jane@example.com"},
-                "schedule": {"id": "PSCHED1", "name": "Primary", "time_zone": "UTC"},
-                "start": "2026-01-08T00:00:00Z",
-                "end": "2026-01-15T00:00:00Z",
-            },
-        ])
+        mock_api_client.iter_all.return_value = iter(
+            [
+                # Valid entry
+                {
+                    "user": {"id": "PUSER1", "name": "John Doe", "email": "john@example.com"},
+                    "schedule": {"id": "PSCHED1", "name": "Primary", "time_zone": "UTC"},
+                    "start": "2026-01-01T00:00:00Z",
+                    "end": "2026-01-08T00:00:00Z",
+                },
+                # Invalid entry (missing user)
+                {
+                    "schedule": {"id": "PSCHED1", "name": "Primary", "time_zone": "UTC"},
+                    "start": "2026-01-01T00:00:00Z",
+                    "end": "2026-01-08T00:00:00Z",
+                },
+                # Another valid entry
+                {
+                    "user": {"id": "PUSER2", "name": "Jane Doe", "email": "jane@example.com"},
+                    "schedule": {"id": "PSCHED1", "name": "Primary", "time_zone": "UTC"},
+                    "start": "2026-01-08T00:00:00Z",
+                    "end": "2026-01-15T00:00:00Z",
+                },
+            ]
+        )
 
         since = datetime(2026, 1, 1, 0, 0, 0)
         until = datetime(2026, 1, 31, 23, 59, 59)

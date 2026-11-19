@@ -101,7 +101,9 @@ class TestFormatJson:
 
     def test_format_json_with_reports(self):
         """Test JSON formatting with reports."""
-        user = User(id="PUSER1", name="Test User", email="test@example.com", html_url="https://example.com")
+        user = User(
+            id="PUSER1", name="Test User", email="test@example.com", html_url="https://example.com"
+        )
 
         report = OnCallReport(
             user=user,
@@ -254,9 +256,15 @@ class TestFormatTableVerbose:
         user2 = User(id="PUSER2", name="User Two", email="user2@example.com")
         user3 = User(id="PUSER3", name="User Three", email="user3@example.com")
 
-        over_report = OnCallReport(user=user1, schedule_name="Schedule A", total_days=15, scheduled_dates=[])
-        at_report = OnCallReport(user=user2, schedule_name="Schedule B", total_days=10, scheduled_dates=[])
-        under_report = OnCallReport(user=user3, schedule_name="Schedule C", total_days=5, scheduled_dates=[])
+        over_report = OnCallReport(
+            user=user1, schedule_name="Schedule A", total_days=15, scheduled_dates=[]
+        )
+        at_report = OnCallReport(
+            user=user2, schedule_name="Schedule B", total_days=10, scheduled_dates=[]
+        )
+        under_report = OnCallReport(
+            user=user3, schedule_name="Schedule C", total_days=5, scheduled_dates=[]
+        )
 
         result = AnalysisResult(
             month=1,

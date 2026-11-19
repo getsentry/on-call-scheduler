@@ -86,7 +86,9 @@ class PagerDutyClient:
             except (NetworkError, RateLimitError) as e:
                 if attempt == max_retries - 1:
                     raise
-                logger.warning(f"Attempt {attempt + 1} failed: {e}. Retrying in {backoff_seconds}s...")
+                logger.warning(
+                    f"Attempt {attempt + 1} failed: {e}. Retrying in {backoff_seconds}s..."
+                )
                 time.sleep(backoff_seconds)
                 backoff_seconds *= 2
             except Exception as e:

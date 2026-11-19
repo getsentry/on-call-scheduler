@@ -56,7 +56,7 @@ class Settings(BaseSettings):
 
     user_timezones: str | None = Field(
         default=None,
-        description="JSON mapping of user emails to timezones, e.g. '{\"user@example.com\": \"America/New_York\"}'",
+        description='JSON mapping of user emails to timezones, e.g. \'{"user@example.com": "America/New_York"}\'',
         validation_alias="USER_TIMEZONES",
     )
 
