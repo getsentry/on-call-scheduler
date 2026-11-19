@@ -36,7 +36,7 @@ def _split_click_multiple(value: tuple) -> list[str]:
     Click's envvar handling for multiple=True options passes the entire env var string
     as a single item rather than splitting on commas. This function normalizes both cases.
     """
-    result = []
+    result: list[str] = []
     for item in value:
         result.extend(s.strip() for s in item.split(",") if s.strip())
     return result
@@ -380,7 +380,7 @@ def check(
 
         # Run analysis
         if months > 1:
-            result = analyze_multiple_months(
+            multi_result = analyze_multiple_months(
                 team_ids=team_list,
                 start_month=target_month,
                 start_year=target_year,
@@ -400,12 +400,12 @@ def check(
 
             # Display results
             if output == "json":
-                click.echo(format_json(result))
+                click.echo(format_json(multi_result))
             else:
                 if verbose:
-                    format_multi_month_table_verbose(result)
+                    format_multi_month_table_verbose(multi_result)
                 else:
-                    format_multi_month_table(result)
+                    format_multi_month_table(multi_result)
         else:
             result = analyze_schedules(
                 team_ids=team_list,

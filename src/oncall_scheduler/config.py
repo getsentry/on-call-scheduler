@@ -144,7 +144,8 @@ class Settings(BaseSettings):
         if not self.user_timezones:
             return {}
         try:
-            return json.loads(self.user_timezones)
+            timezones: dict[str, str] = json.loads(self.user_timezones)
+            return timezones
         except json.JSONDecodeError:
             return {}
 
@@ -218,7 +219,8 @@ class Settings(BaseSettings):
 
 def load_settings() -> Settings:
     """Load and return application settings."""
-    return Settings()
+    # Required fields come from the environment / .env, which mypy can't see
+    return Settings()  # type: ignore[call-arg]
 
 
 def load_pto_data(pto_file: str) -> dict[str, list[dict[str, str]]]:
@@ -250,7 +252,8 @@ def load_pto_data(pto_file: str) -> dict[str, list[dict[str, str]]]:
         raise FileNotFoundError(f"PTO file not found: {pto_file}")
 
     with open(path, encoding="utf-8") as f:
-        return json.load(f)
+        data: dict[str, list[dict[str, str]]] = json.load(f)
+    return data
 
 
 def load_holiday_data(holiday_file: str) -> dict[str, list[dict[str, str]]]:
@@ -283,4 +286,5 @@ def load_holiday_data(holiday_file: str) -> dict[str, list[dict[str, str]]]:
         raise FileNotFoundError(f"Holiday file not found: {holiday_file}")
 
     with open(path, encoding="utf-8") as f:
-        return json.load(f)
+        data: dict[str, list[dict[str, str]]] = json.load(f)
+    return data

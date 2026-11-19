@@ -3,6 +3,7 @@
 import logging
 import time
 from datetime import datetime
+from typing import NoReturn
 
 import pagerduty
 
@@ -28,7 +29,7 @@ class PagerDutyClient:
             api_key: PagerDuty API key
         """
         self.api_key = api_key
-        self.client = None
+        self.client: pagerduty.RestApiV2Client | None = None
 
     def _get_client(self) -> pagerduty.RestApiV2Client:
         """Get or create API client."""
@@ -36,7 +37,7 @@ class PagerDutyClient:
             self.client = pagerduty.RestApiV2Client(self.api_key)
         return self.client
 
-    def _handle_api_error(self, error: Exception) -> None:
+    def _handle_api_error(self, error: Exception) -> NoReturn:
         """Map pagerduty exceptions to custom exceptions.
 
         Args:
@@ -107,7 +108,6 @@ class PagerDutyClient:
             ResourceNotFoundError: If a team is not found
             PagerDutyAPIError: For other API errors
         """
-        schedules = []
         client = self._get_client()
 
         def _fetch_schedules():
@@ -125,7 +125,7 @@ class PagerDutyClient:
                             logger.debug(f"Found schedule: {schedule.name} ({schedule.id})")
 
                 except pagerduty.HttpError as e:
-                    if e.response.status_code == 404:
+                    if e.response is not None and e.response.status_code == 404:
                         logger.warning(f"Team {team_id} not found, skipping")
                         continue
                     else:
@@ -133,7 +133,7 @@ class PagerDutyClient:
 
             return schedule_list
 
-        schedules = self._retry_with_backoff(_fetch_schedules)
+        schedules: list[Schedule] = self._retry_with_backoff(_fetch_schedules)
         logger.info(f"Found {len(schedules)} schedules across {len(team_ids)} teams")
         return schedules
 
@@ -142,7 +142,7 @@ class PagerDutyClient:
         schedule_ids: list[str],
         since: datetime,
         until: datetime,
-        user_timezones: dict[str, str] = None,
+        user_timezones: dict[str, str] | None = None,
     ) -> list[ScheduleEntry]:
         """Fetch on-call entries for specified schedules and time range.
 
@@ -204,7 +204,8 @@ class PagerDutyClient:
             logger.info(f"Found {len(entries)} on-call entries")
             return entries
 
-        return self._retry_with_backoff(_fetch_oncalls)
+        entries: list[ScheduleEntry] = self._retry_with_backoff(_fetch_oncalls)
+        return entries
 
     def test_connection(self) -> bool:
         """Test the API connection and authentication.
