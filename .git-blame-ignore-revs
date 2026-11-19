@@ -1,0 +1,5 @@
+# Mechanical reformats. GitHub skips these in blame; locally run:
+#   git config blame.ignoreRevsFile .git-blame-ignore-revs
+
+# style: Format the codebase with ruff format
+09f1d1890d2c9fa248af9956476d39fc36d76185
