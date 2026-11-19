@@ -36,7 +36,7 @@ def _split_click_multiple(value: tuple) -> list[str]:
     Click's envvar handling for multiple=True options passes the entire env var string
     as a single item rather than splitting on commas. This function normalizes both cases.
     """
-    result = []
+    result: list[str] = []
     for item in value:
         result.extend(s.strip() for s in item.split(",") if s.strip())
     return result
@@ -138,21 +138,30 @@ def cli():
     "-z",
     "timezones",
     multiple=True,
-    help="Only include users in specified timezones (can be specified multiple times, e.g. --timezone America/New_York --timezone Europe/London)",
+    help=(
+        "Only include users in specified timezones (can be specified multiple times, e.g. "
+        "--timezone America/New_York --timezone Europe/London)"
+    ),
 )
 @click.option(
     "--exclude-user",
     "-e",
     "excluded_users",
     multiple=True,
-    help="Exclude specific users from over-limit reporting (can be specified multiple times, e.g. --exclude-user user1@example.com --exclude-user user2@example.com)",
+    help=(
+        "Exclude specific users from over-limit reporting (can be specified multiple times, e.g. "
+        "--exclude-user user1@example.com --exclude-user user2@example.com)"
+    ),
 )
 @click.option(
     "--exclude-schedule",
     "-s",
     "excluded_schedules",
     multiple=True,
-    help="Exclude specific schedules from analysis by ID or name (can be specified multiple times, e.g. --exclude-schedule SCHEDULE1 --exclude-schedule 'Primary On-Call')",
+    help=(
+        "Exclude specific schedules from analysis by ID or name (can be specified multiple times, "
+        "e.g. --exclude-schedule SCHEDULE1 --exclude-schedule 'Primary On-Call')"
+    ),
 )
 @click.option(
     "--pto-file",
@@ -168,21 +177,30 @@ def cli():
     "holiday_file",
     type=click.Path(exists=True),
     envvar="HOLIDAY_FILE",
-    help="Path to JSON file containing holiday data to check for on-call conflicts (keyed by timezone)",
+    help=(
+        "Path to JSON file containing holiday data to check for on-call conflicts (keyed by "
+        "timezone)"
+    ),
 )
 @click.option(
     "--include-schedules-from-holidays",
     "included_schedules_for_holidays",
     multiple=True,
     envvar="INCLUDE_SCHEDULES_FROM_HOLIDAYS",
-    help="Only check specified schedules for holiday conflicts by ID or name (can be specified multiple times)",
+    help=(
+        "Only check specified schedules for holiday conflicts by ID or name (can be specified "
+        "multiple times)"
+    ),
 )
 @click.option(
     "--exclude-schedules-from-holidays",
     "excluded_schedules_for_holidays",
     multiple=True,
     envvar="EXCLUDE_SCHEDULES_FROM_HOLIDAYS",
-    help="Exclude specified schedules from holiday conflict checking by ID or name (can be specified multiple times)",
+    help=(
+        "Exclude specified schedules from holiday conflict checking by ID or name (can be "
+        "specified multiple times)"
+    ),
 )
 def check(
     teams: tuple,
@@ -228,8 +246,7 @@ def check(
 
     if not team_list:
         click.echo(
-            "Error: No team IDs specified. "
-            "Use --team option or set PAGERDUTY_TEAM_IDS in .env",
+            "Error: No team IDs specified. Use --team option or set PAGERDUTY_TEAM_IDS in .env",
             err=True,
         )
         sys.exit(1)
@@ -238,19 +255,33 @@ def check(
     max_days_limit = max_days if max_days is not None else settings.oncall_max_days
 
     # Determine timezones of concern (CLI args take precedence over config)
-    timezones_of_concern_list: list[str] = list(timezones) if timezones else settings.get_timezones_of_concern()
+    timezones_of_concern_list: list[str] = (
+        list(timezones) if timezones else settings.get_timezones_of_concern()
+    )
 
     # Determine excluded users (CLI args take precedence over config)
-    excluded_users_list: list[str] = list(excluded_users) if excluded_users else settings.get_excluded_users()
+    excluded_users_list: list[str] = (
+        list(excluded_users) if excluded_users else settings.get_excluded_users()
+    )
 
     # Determine excluded schedules (CLI args take precedence over config)
-    excluded_schedules_list: list[str] = list(excluded_schedules) if excluded_schedules else settings.get_excluded_schedules()
+    excluded_schedules_list: list[str] = (
+        list(excluded_schedules) if excluded_schedules else settings.get_excluded_schedules()
+    )
 
     # Determine included schedules for holidays (CLI args take precedence over config)
-    included_schedules_for_holidays_list: list[str] = _split_click_multiple(included_schedules_for_holidays) if included_schedules_for_holidays else settings.get_included_schedules_for_holidays()
+    included_schedules_for_holidays_list: list[str] = (
+        _split_click_multiple(included_schedules_for_holidays)
+        if included_schedules_for_holidays
+        else settings.get_included_schedules_for_holidays()
+    )
 
     # Determine excluded schedules for holidays (CLI args take precedence over config)
-    excluded_schedules_for_holidays_list: list[str] = _split_click_multiple(excluded_schedules_for_holidays) if excluded_schedules_for_holidays else settings.get_excluded_schedules_for_holidays()
+    excluded_schedules_for_holidays_list: list[str] = (
+        _split_click_multiple(excluded_schedules_for_holidays)
+        if excluded_schedules_for_holidays
+        else settings.get_excluded_schedules_for_holidays()
+    )
 
     # Determine PTO file (CLI arg takes precedence over config)
     pto_file_path = pto_file if pto_file else settings.pto_file
@@ -313,11 +344,23 @@ def check(
             click.echo(f"PTO: {len(pto_by_email)} users, {total_periods} periods loaded", err=True)
         if holidays_by_timezone:
             total_holidays = sum(len(holidays) for holidays in holidays_by_timezone.values())
-            click.echo(f"Holidays: {len(holidays_by_timezone)} timezones, {total_holidays} holidays loaded", err=True)
+            click.echo(
+                f"Holidays: {len(holidays_by_timezone)} timezones, "
+                f"{total_holidays} holidays loaded",
+                err=True,
+            )
         if included_schedules_for_holidays_list:
-            click.echo(f"Holiday conflict included schedules: {', '.join(included_schedules_for_holidays_list)}", err=True)
+            click.echo(
+                "Holiday conflict included schedules: "
+                f"{', '.join(included_schedules_for_holidays_list)}",
+                err=True,
+            )
         if excluded_schedules_for_holidays_list:
-            click.echo(f"Holiday conflict excluded schedules: {', '.join(excluded_schedules_for_holidays_list)}", err=True)
+            click.echo(
+                "Holiday conflict excluded schedules: "
+                f"{', '.join(excluded_schedules_for_holidays_list)}",
+                err=True,
+            )
         click.echo("", err=True)
 
     try:
@@ -337,7 +380,7 @@ def check(
 
         # Run analysis
         if months > 1:
-            result = analyze_multiple_months(
+            multi_result = analyze_multiple_months(
                 team_ids=team_list,
                 start_month=target_month,
                 start_year=target_year,
@@ -357,12 +400,12 @@ def check(
 
             # Display results
             if output == "json":
-                click.echo(format_json(result))
+                click.echo(format_json(multi_result))
             else:
                 if verbose:
-                    format_multi_month_table_verbose(result)
+                    format_multi_month_table_verbose(multi_result)
                 else:
-                    format_multi_month_table(result)
+                    format_multi_month_table(multi_result)
         else:
             result = analyze_schedules(
                 team_ids=team_list,

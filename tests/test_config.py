@@ -110,11 +110,15 @@ class TestSettings:
 
         assert team_ids == ["TEAM1", "TEAM2", "TEAM3"]
 
-    @patch.dict(os.environ, {
-        "PAGERDUTY_API_KEY": "env_key",
-        "ONCALL_MAX_DAYS": "25",
-        "PAGERDUTY_TEAM_IDS": "TEAM_ENV1,TEAM_ENV2",
-    }, clear=True)
+    @patch.dict(
+        os.environ,
+        {
+            "PAGERDUTY_API_KEY": "env_key",
+            "ONCALL_MAX_DAYS": "25",
+            "PAGERDUTY_TEAM_IDS": "TEAM_ENV1,TEAM_ENV2",
+        },
+        clear=True,
+    )
     def test_settings_from_environment(self):
         """Test loading settings from environment variables."""
         settings = Settings()
@@ -123,11 +127,15 @@ class TestSettings:
         assert settings.oncall_max_days == 25
         assert settings.get_team_ids() == ["TEAM_ENV1", "TEAM_ENV2"]
 
-    @patch.dict(os.environ, {
-        "PAGERDUTY_API_KEY": "env_key",
-        "SENTRY_DSN": "https://sentry@example.com/123",
-        "SENTRY_ENVIRONMENT": "development",
-    }, clear=True)
+    @patch.dict(
+        os.environ,
+        {
+            "PAGERDUTY_API_KEY": "env_key",
+            "SENTRY_DSN": "https://sentry@example.com/123",
+            "SENTRY_ENVIRONMENT": "development",
+        },
+        clear=True,
+    )
     def test_settings_sentry_from_environment(self):
         """Test loading Sentry settings from environment."""
         settings = Settings()
@@ -135,9 +143,13 @@ class TestSettings:
         assert settings.sentry_dsn == "https://sentry@example.com/123"
         assert settings.sentry_environment == "development"
 
-    @patch.dict(os.environ, {
-        "PAGERDUTY_API_KEY": "env_key",
-    }, clear=True)
+    @patch.dict(
+        os.environ,
+        {
+            "PAGERDUTY_API_KEY": "env_key",
+        },
+        clear=True,
+    )
     def test_settings_case_insensitive(self):
         """Test that settings are case insensitive."""
         # The model_config specifies case_sensitive=False
@@ -151,9 +163,13 @@ class TestSettings:
 class TestLoadSettings:
     """Tests for the load_settings function."""
 
-    @patch.dict(os.environ, {
-        "PAGERDUTY_API_KEY": "test_key",
-    }, clear=True)
+    @patch.dict(
+        os.environ,
+        {
+            "PAGERDUTY_API_KEY": "test_key",
+        },
+        clear=True,
+    )
     def test_load_settings(self):
         """Test load_settings function."""
         settings = load_settings()
@@ -255,7 +271,6 @@ class TestLoadPtoData:
 
     def test_load_pto_data_empty_file(self, tmp_path):
         """Test loading an empty PTO data file."""
-        import json
 
         pto_file = tmp_path / "empty.json"
         pto_file.write_text("{}")

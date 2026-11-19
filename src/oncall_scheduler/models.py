@@ -61,7 +61,9 @@ class ScheduleEntry:
     end: datetime
 
     @classmethod
-    def from_oncall_response(cls, data: dict, user_timezone_override: str | None = None) -> "ScheduleEntry":
+    def from_oncall_response(
+        cls, data: dict, user_timezone_override: str | None = None
+    ) -> "ScheduleEntry":
         """Create a ScheduleEntry from PagerDuty oncalls API response data.
 
         Args:

@@ -1,8 +1,7 @@
 """Tests for on-call days calculator."""
 
-from datetime import date, datetime, timedelta
+from datetime import date, datetime
 
-import pytest
 import pytz
 
 from oncall_scheduler.analysis.calculator import (

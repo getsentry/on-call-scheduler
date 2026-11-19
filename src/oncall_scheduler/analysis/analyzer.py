@@ -87,7 +87,8 @@ def _find_holiday_conflicts(
         user_schedule_days: Dictionary mapping user IDs to schedule names to sets of on-call dates
         users: Dictionary mapping user IDs to User objects
         holidays_by_timezone: Dictionary mapping timezones to lists of HolidayEntry objects
-        included_schedules: Optional list of schedule names to check. If empty/None, all schedules are checked.
+        included_schedules: Optional list of schedule names to check. If empty/None, all schedules
+            are checked.
         excluded_schedules: Optional list of schedule names to exclude from checking.
 
     Returns:
@@ -165,14 +166,17 @@ def analyze_schedules(
         client: PagerDutyClient instance for API calls
         workday_end_hour: Hour (0-23) when standard workday ends (default: 17 for 5 PM)
         user_timezones: Optional mapping of user emails to timezone strings
-        timezones_of_concern: Optional list of timezones to include (empty list means all timezones included)
+        timezones_of_concern: Optional list of timezones to include (empty list means all timezones
+            included)
         excluded_users: Optional list of user emails to exclude from over-limit reporting
         excluded_schedules: Optional list of schedule IDs or names to exclude from analysis
         pto_by_email: Optional dict mapping user emails to lists of PTO entries
         holidays_by_timezone: Optional dict mapping timezones to lists of HolidayEntry objects
-        included_schedules_for_holidays: Optional list of schedule IDs or names to check for holiday conflicts.
+        included_schedules_for_holidays: Optional list of schedule IDs or names to check for holiday
+            conflicts.
             If empty/None, all schedules are checked.
-        excluded_schedules_for_holidays: Optional list of schedule IDs or names to exclude from holiday conflict checking.
+        excluded_schedules_for_holidays: Optional list of schedule IDs or names to exclude from
+            holiday conflict checking.
 
     Returns:
         AnalysisResult containing categorized user reports
@@ -214,11 +218,18 @@ def analyze_schedules(
         logger.info(f"Checking PTO for {len(pto_by_email)} users ({total_pto_periods} periods)")
     if holidays_by_timezone:
         total_holidays = sum(len(holidays) for holidays in holidays_by_timezone.values())
-        logger.info(f"Checking holidays for {len(holidays_by_timezone)} timezones ({total_holidays} holidays)")
+        logger.info(
+            f"Checking holidays for {len(holidays_by_timezone)} timezones "
+            f"({total_holidays} holidays)"
+        )
     if included_schedules_for_holidays:
-        logger.info(f"Holiday conflict schedules limited to: {', '.join(included_schedules_for_holidays)}")
+        logger.info(
+            f"Holiday conflict schedules limited to: {', '.join(included_schedules_for_holidays)}"
+        )
     if excluded_schedules_for_holidays:
-        logger.info(f"Holiday conflict schedules excluded: {', '.join(excluded_schedules_for_holidays)}")
+        logger.info(
+            f"Holiday conflict schedules excluded: {', '.join(excluded_schedules_for_holidays)}"
+        )
 
     # Step 1: Fetch schedules for the specified teams
     all_schedules = client.get_schedules_by_team(team_ids)
@@ -317,7 +328,9 @@ def analyze_schedules(
 
         # Filter by timezone if timezones_of_concern is specified
         if timezones_of_concern and user.timezone not in timezones_of_concern:
-            logger.debug(f"FILTERED: {user.name} - timezone {user.timezone} not in timezones of concern")
+            logger.debug(
+                f"FILTERED: {user.name} - timezone {user.timezone} not in timezones of concern"
+            )
             continue
 
         # Filter by excluded users if specified
@@ -435,14 +448,17 @@ def analyze_multiple_months(
         client: PagerDutyClient instance for API calls
         workday_end_hour: Hour (0-23) when standard workday ends (default: 17 for 5 PM)
         user_timezones: Optional mapping of user emails to timezone strings
-        timezones_of_concern: Optional list of timezones to include (empty list means all timezones included)
+        timezones_of_concern: Optional list of timezones to include (empty list means all timezones
+            included)
         excluded_users: Optional list of user emails to exclude from over-limit reporting
         excluded_schedules: Optional list of schedule IDs or names to exclude from analysis
         pto_by_email: Optional dict mapping user emails to lists of PTO entries
         holidays_by_timezone: Optional dict mapping timezones to lists of HolidayEntry objects
-        included_schedules_for_holidays: Optional list of schedule IDs or names to check for holiday conflicts.
+        included_schedules_for_holidays: Optional list of schedule IDs or names to check for holiday
+            conflicts.
             If empty/None, all schedules are checked.
-        excluded_schedules_for_holidays: Optional list of schedule IDs or names to exclude from holiday conflict checking.
+        excluded_schedules_for_holidays: Optional list of schedule IDs or names to exclude from
+            holiday conflict checking.
 
     Returns:
         MultiMonthAnalysisResult containing results for each month

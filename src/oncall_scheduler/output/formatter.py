@@ -93,7 +93,9 @@ def _create_pto_conflicts_table(include_month_column: bool = False) -> Table:
     return table
 
 
-def _format_pto_conflicts_table(conflicts: list[PTOConflict], console: Console, month_label: str | None = None) -> None:
+def _format_pto_conflicts_table(
+    conflicts: list[PTOConflict], console: Console, month_label: str | None = None
+) -> None:
     """Format and display PTO conflicts as a Rich table.
 
     Args:
@@ -187,7 +189,9 @@ def _create_holiday_conflicts_table(include_month_column: bool = False) -> Table
     return table
 
 
-def _format_holiday_conflicts_table(conflicts: list[HolidayConflict], console: Console, month_label: str | None = None) -> None:
+def _format_holiday_conflicts_table(
+    conflicts: list[HolidayConflict], console: Console, month_label: str | None = None
+) -> None:
     """Format and display holiday conflicts as a Rich table.
 
     Args:
@@ -210,7 +214,9 @@ def _format_holiday_conflicts_table(conflicts: list[HolidayConflict], console: C
     console.print(table)
 
 
-def _format_multi_month_holiday_conflicts_table(results: list[AnalysisResult], console: Console) -> int:
+def _format_multi_month_holiday_conflicts_table(
+    results: list[AnalysisResult], console: Console
+) -> int:
     """Format and display holiday conflicts from multiple months as a Rich table.
 
     Args:
@@ -279,9 +285,7 @@ def format_table(result: AnalysisResult) -> None:
     # Header
     month_name = calendar.month_name[result.month]
     console.print()
-    console.print(
-        f"[bold cyan]PagerDuty On-Call Analysis - {month_name} {result.year}[/bold cyan]"
-    )
+    console.print(f"[bold cyan]PagerDuty On-Call Analysis - {month_name} {result.year}[/bold cyan]")
     console.print(f"[cyan]Max Days Allowed: {result.max_days}[/cyan]")
     console.print()
 
@@ -344,9 +348,7 @@ def format_table_verbose(result: AnalysisResult) -> None:
     # Header
     month_name = calendar.month_name[result.month]
     console.print()
-    console.print(
-        f"[bold cyan]PagerDuty On-Call Analysis - {month_name} {result.year}[/bold cyan]"
-    )
+    console.print(f"[bold cyan]PagerDuty On-Call Analysis - {month_name} {result.year}[/bold cyan]")
     console.print(f"[cyan]Max Days Allowed: {result.max_days}[/cyan]")
     console.print()
 
@@ -448,8 +450,7 @@ def format_multi_month_table(result: MultiMonthAnalysisResult) -> None:
 
     if total_under > 0:
         console.print(
-            f"[green]Users under limit: {total_under} "
-            f"(use --verbose to see details)[/green]"
+            f"[green]Users under limit: {total_under} (use --verbose to see details)[/green]"
         )
 
     # Display PTO conflicts if any

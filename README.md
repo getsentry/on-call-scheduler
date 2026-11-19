@@ -393,14 +393,16 @@ uv run pytest tests/test_calculator.py
 
 ```bash
 # Format code
-uv run black src/oncall_scheduler tests
+uv run ruff format .
 
-# Lint code
-uv run ruff check src/oncall_scheduler tests
+# Lint code (add --fix to apply safe fixes)
+uv run ruff check .
 
 # Type checking
 uv run mypy src/oncall_scheduler
 ```
+
+CI runs `ruff format --check`, `ruff check` and `mypy` on every pull request and fails if any of them reports anything.
 
 ## Troubleshooting
 
