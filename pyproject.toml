@@ -41,6 +41,13 @@ build-backend = "hatchling.build"
 [tool.hatch.build.targets.wheel]
 packages = ["src/oncall_scheduler"]
 
+# Resolve all dependencies through Sentry's dependency firewall (the same index
+# Dependabot uses), so local `uv lock` runs don't rewrite uv.lock back to PyPI.
+[[tool.uv.index]]
+name = "sfw"
+url = "https://sfw.security.sentry.io/pypi/simple"
+default = true
+
 [tool.ruff]
 line-length = 100
 target-version = "py312"
