@@ -73,6 +73,7 @@ def init_sentry(dsn: str | None, environment: str, verbose: bool = False):
             traces_sample_rate=1.0,
             profile_session_sample_rate=1.0,
             profile_lifecycle="trace",
+            trace_propagation_targets=[],
             data_collection={
                 "user_info": False,
                 "http_bodies": [],
